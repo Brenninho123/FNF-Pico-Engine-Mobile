@@ -2,9 +2,10 @@
 <project>
 	<!-- _________________________ Application Settings _________________________ -->
 
-	<app title="Friday Night Funkin': Pico Engine" file="PicoEngine" packageName="com.lucas62944.pico-engine-team.fnf-pico-funkin" package="com.lucas62944.pico-engine-team.fnf-pico-funkin"
+	<app title="FNF': Pico Engine" file="Pico-Engine"
+	packageName="com.Pico-Engine-Team.FNF-Pico-Engine" package="com.Pico-Engine-Team.FNF-Pico-Engine"
 	main="lucas.states.funkin.scripts.backend.Main"
-	version="2.26.6 (pre-release)" company="Lucas62944" />
+	version="v2.26.6" company="Pico-Engine-Team" />
 
 	<!--Switch Export with Unique ApplicationID and Icon-->
 	<set name="APP_ID" value="0x0100f6c013bbc000" />
@@ -30,7 +31,7 @@
 	<define name="TRANSLATIONS_ALLOWED" />
 	<define name="IRIS_DEBUG"/>
 	<define name="PICO_ALLOWED" />
-	<define name="PSYCH_ALLOWED" />
+	<define name="PSYCH_ALLOWED" if="desktop" />
 	
 	<define name="MULTITHREADED_LOADING" /> <!-- UNCOMMENTING THIS LINE WILL ENABLE MULTITHREADED LOADING, WHICH IMPROVES LOADING TIMES, BUT APPARENTLY CAN FREEZE THE GAME ON SONG LOAD IN OLDER PCs? -->
 	<define name="SHOW_LOADING_SCREEN" />
@@ -43,6 +44,7 @@
 	</section>
 
 	<!-- __________________________ Dev / Local Build ___________________________ -->
+	
 	<section if="dev_build">
 		<define name="BASE_GAME_FILES" />
 		<define name="TITLE_SCREEN_EASTER_EGG" />
@@ -66,12 +68,11 @@
 	<window if="switch" orientation="landscape" fullscreen="true" width="0" height="0" resizable="true" />
 
 	<!-- _____________________________ Path Settings ____________________________ -->
-
+	
+	<classpath name="source" />
 	<set name="BUILD_DIR" value="export/debug" if="debug" />
 	<set name="BUILD_DIR" value="export/release" unless="debug" />
 	<set name="BUILD_DIR" value="export/32bit" if="32bits" />
-
-	<classpath name="source" />
 
 	<!-- __________________________ Game Assets & Etc. __________________________ -->
 	
@@ -121,7 +122,7 @@
 		<assets path="alsoft.txt" rename="alsoft.ini" type="text" if="windows"/>
 		<assets path="alsoft.txt" rename="plugins/alsoft.dat" type="text" if="windows"/>
 		<assets path="content/audio-config.txt" rename="content/plugins/audio-config.ini" type="text" if="windows"/>
-		<assets path="gitChangelog.txt" rename="Changelog.md" type="text" if="windows"/>
+		<assets path="content/updates/gitChangelog.txt" rename="Changelog.md" type="text" if="windows"/>
 		<assets path="alsoft-plugins.txt" rename="plugins/Plugins.dat" type="text" if="windows"/>
 	</section>
 

@@ -1,0 +1,9 @@
+{
+	"directory": "weekspecial",
+	"defaultZoom": 0.65,
+	"stageUI": "exe",
+
+	"boyfriend": [ 550, -45 ],
+	"girlfriend": [ 100, -45 ],
+	"opponent": [ -250, 0 ]
+}

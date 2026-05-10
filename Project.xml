@@ -4,7 +4,7 @@
 
 	<app title="FNF': Pico Engine" file="Pico-Engine"
 	packageName="com.Pico-Engine-Team.FNF-Pico-Engine" package="com.Pico-Engine-Team.FNF-Pico-Engine"
-	main="lucas.states.funkin.scripts.backend.Main"
+	main="funkin.utils.Main"
 	version="v2.26.6" company="Pico-Engine-Team" />
 
 	<!--Switch Export with Unique ApplicationID and Icon-->

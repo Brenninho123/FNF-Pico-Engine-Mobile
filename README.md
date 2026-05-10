@@ -8,8 +8,8 @@ The engine preserves the core structure of Psych Engine while introducing custom
 
 The main goal of this project is to provide modders with an engine that simplifies the creation of Pico-centered mods, without sacrificing the flexibility, stability, and features of the original Psych Engine
 
-Credits:
+# Credits
 * Psych Engine: Shadow Mario
 * Pico Engine: Lucas Sanches
-* Friday Night Funkin’: [Ninjamuffin99](https://x.com/ninja_muffin99), [PhantomArcade](https://x.com/PhantomArcade3K),[KawaiSprite](https://x.com/kawaisprite), and Evilsk8r
+* Friday Night Funkin’: [Ninjamuffin99](https://x.com/ninja_muffin99), [PhantomArcade](https://x.com/PhantomArcade3K), [KawaiSprite](https://x.com/kawaisprite), and Evilsk8r
 * Modifications and additional features: ([P-Slice Team](https://gamebanana.com/studios/38275)/[Psych Plus Team](https://github.com/Psych-Plus-Team)/FunkinCommunity)

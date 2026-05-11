@@ -1,5 +1,11 @@
 package funkin.utils;
 
+import funkin.ClientPrefs;
+import funkin.play.PlayState;
+import funkin.utils.Conductor;
+import funkin.menus.MainMenuState;
+import funkin.states.MusicBeatState;
+
 import openfl.Lib;
 import openfl.display.BitmapData;
 import openfl.display.Bitmap;
@@ -10,12 +16,6 @@ import openfl.display.Sprite;
 import lime.graphics.opengl.GL;
 import lime.utils.Int32Array;
 import flixel.FlxG;
-
-import funkin.ClientPrefs;
-import funkin.utils.Conductor;
-import funkin.states.MusicBeatState;
-import funkin.play.PlayState;
-import funkin.states.data.menus.MainMenuState;
 
 /**
 	The FPS class provides an easy-to-use monitor to display

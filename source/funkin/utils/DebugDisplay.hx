@@ -1,10 +1,10 @@
 package funkin.utils;
 
-import funkin.ClientPrefs;
-import funkin.play.PlayState;
-import funkin.utils.Conductor;
-import funkin.menus.MainMenuState;
-import funkin.states.MusicBeatState;
+import funkin.data.ClientPrefs; // New Folder for Source Code
+import funkin.play.PlayState; // New Folder for Source Code
+import funkin.utils.Conductor; // New Folder for Source Code
+import funkin.menus.MainMenuState; // New Folder for Source Code
+import funkin.states.MusicBeatState; // New Folder for Source Code
 
 import openfl.Lib;
 import openfl.display.BitmapData;
@@ -156,11 +156,11 @@ class DebugDisplay extends Sprite
 		switch(debugType)
 		{
 			case 'FPS Only':
-				leftText.text = 'FPS: $currentFPS\nPico Engine v${MainMenuState.PicoVersion}';
+				leftText.text = 'FPS: $currentFPS';
 			case 'FPS and Memory':
 				leftText.text = 'FPS: $currentFPS\n${ramText}\nPico Engine v${MainMenuState.PicoVersion}';
 			case 'Everything':
-				leftText.text = 'FPS: $currentFPS\nState: ${Type.getClassName(Type.getClass(FlxG.state))}\n${ramText}\n${gpuStr}';
+				leftText.text = 'FPS: $currentFPS\nState: ${Type.getClassName(Type.getClass(FlxG.state))}\n${ramText}\nPico Engine v${MainMenuState.PicoVersion}\n${gpuStr}';
 		}
 	}
 

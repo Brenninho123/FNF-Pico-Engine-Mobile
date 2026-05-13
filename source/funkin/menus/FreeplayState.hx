@@ -14,10 +14,11 @@ import openfl.utils.Assets;
 import haxe.Json;
 
 // Pico Engine 
-import lucas.states.funkin.util.funkin.metadata.SongMetadata;
+import lucas.states.funkin.util.funkin.metadata.SongMetadata as PicoSongMetadata;
 import lucas.states.funkin.util.funkin.metadata.SongMetadataBridge;
 import lucas.states.funkin.util.funkin.metadata.SongMetadata.SongMetadataStruct;
 import lucas.states.funkin.util.funkin.FreeplayMetaHelper;
+import lucas.states.funkin.scripts.menus.extra.ExtraSongsState;
 
 class FreeplayState extends MusicBeatState
 {
@@ -257,6 +258,29 @@ class FreeplayState extends MusicBeatState
 		PlayState.loadSongWithVariationFallback(songId, null, curDifficulty, false);
 	}
 
+	function getLoadedFreeplaySongAssetId(?songName:String = null):String
+	{
+		var baseId:String = songName == null ? PlayState.SONG.song : songName;
+		return PlayState.getSongAssetId(baseId, PlayState.SONG, curDifficulty);
+	}
+
+	function getLoadedFreeplaySongAudioId(?songName:String = null):String
+	{
+		var baseId:String = songName == null ? PlayState.SONG.song : songName;
+		return PlayState.getSongAudioId(baseId, PlayState.SONG, curDifficulty);
+	}
+
+	function getFreeplayPreviewSongId():String
+	{
+		var songId:String = getLoadedFreeplaySongAssetId(songs[curSelected].songName);
+		if(!metaCache.exists(songId))
+		{
+			var meta:SongMetadataStruct = PicoSongMetadata.loadFromPath(songId);
+			if(meta != null) metaCache.set(songId, meta);
+		}
+		return songId;
+	}
+
 	var stopMusicPlay:Bool = false;
 	override function update(elapsed:Float)
 	{
@@ -272,9 +296,9 @@ class FreeplayState extends MusicBeatState
 				if (FlxG.mouse.justPressed && canMove)
 				{
 					#if PICO_ALLOWED
-					MusicBeatState.switchState(new lucas.states.funkin.scripts.menus.extra.ExtraSongsState());
+					MusicBeatState.switchState(new ExtraSongsState());
 					#else
-					MusicBeatState.switchState(new funkin.menus.FreeplayState());
+					MusicBeatState.switchState(new ExtraSongsState());
 					#end
 					FlxG.mouse.visible = false;
 					FlxG.sound.play(Paths.sound('secret'));
@@ -399,14 +423,15 @@ class FreeplayState extends MusicBeatState
 
 				Mods.currentModDirectory = songs[curSelected].folder;
 				loadFreeplaySong();
+				var songAssetId:String = getLoadedFreeplaySongAudioId();
 				if (PlayState.SONG.needsVoices)
 				{
 					vocals = new FlxSound();
 					try
 					{
 						var playerVocals:String = getVocalFromCharacter(PlayState.SONG.player1);
-						var loadedVocals = Paths.voices(PlayState.SONG.song, (playerVocals != null && playerVocals.length > 0) ? playerVocals : 'Player');
-						if(loadedVocals == null) loadedVocals = Paths.voices(PlayState.SONG.song);
+						var loadedVocals = Paths.voices(songAssetId, (playerVocals != null && playerVocals.length > 0) ? playerVocals : 'Player');
+						if(loadedVocals == null) loadedVocals = Paths.voices(songAssetId);
 						
 						if(loadedVocals != null && loadedVocals.length > 0)
 						{
@@ -429,7 +454,7 @@ class FreeplayState extends MusicBeatState
 					{
 						//trace('please work...');
 						var oppVocals:String = getVocalFromCharacter(PlayState.SONG.player2);
-						var loadedVocals = Paths.voices(PlayState.SONG.song, (oppVocals != null && oppVocals.length > 0) ? oppVocals : 'Opponent');
+						var loadedVocals = Paths.voices(songAssetId, (oppVocals != null && oppVocals.length > 0) ? oppVocals : 'Opponent');
 						
 						if(loadedVocals != null && loadedVocals.length > 0)
 						{
@@ -450,7 +475,7 @@ class FreeplayState extends MusicBeatState
 					}
 				}
 
-				FlxG.sound.playMusic(Paths.inst(PlayState.SONG.song), 0.8);
+				FlxG.sound.playMusic(Paths.inst(songAssetId), 0.8);
 				FlxG.sound.music.pause();
 				instPlaying = curSelected;
 
@@ -460,7 +485,7 @@ class FreeplayState extends MusicBeatState
 				player.pauseOrResume(true);
 
 				// Pico Engine — pula para o previewStart do metadata V-Slice
-				var _sid:String = Paths.formatToSongPath(songs[curSelected].songName);
+				var _sid:String = getFreeplayPreviewSongId();
 				var _pStart:Float = FreeplayMetaHelper.getPreviewStart(metaCache, _sid);
 				if (_pStart > 0 && FlxG.sound.music != null)
 				{
@@ -532,7 +557,7 @@ class FreeplayState extends MusicBeatState
 		// Pico Engine — loop de previewStart/previewEnd enquanto preview toca
 		if (player.playingMusic && player.playing && FlxG.sound.music != null)
 		{
-			var _sid:String = Paths.formatToSongPath(songs[curSelected].songName);
+			var _sid:String = getFreeplayPreviewSongId();
 			FreeplayMetaHelper.applyPreview(FlxG.sound.music, metaCache, _sid);
 		}
 
@@ -617,7 +642,7 @@ class FreeplayState extends MusicBeatState
 		
 		Mods.currentModDirectory = songs[curSelected].folder;
 		PlayState.storyWeek = songs[curSelected].week;
-		Difficulty.loadFromWeek();
+		Difficulty.loadFromWeek(WeekData.weeksLoaded.get(WeekData.weeksList[songs[curSelected].week]), true);
 		
 		var savedDiff:String = songs[curSelected].lastDifficulty;
 		var savedDiffIndex:Int = getDifficultyIndex(savedDiff);

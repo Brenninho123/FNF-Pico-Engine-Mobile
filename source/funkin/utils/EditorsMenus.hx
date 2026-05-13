@@ -2,21 +2,21 @@ package funkin.utils;
 
 import funkin.data.WeekData;
 import funkin.data.characters.Character;
-import funkin.states.data.menus.MainMenuState;
-import funkin.states.data.menus.freeplay.FreeplayState;
 import funkin.data.editors.*;
+import funkin.menus.MainMenuState;
+import funkin.menus.FreeplayState;
 
 class EditorsMenus extends MusicBeatState
 {
 	private var options:Array<String> =
 	[
 		'Chart Editor',
-		'Chart Converter',
 		'Character Editor',
 		'Stage Editor',
 		'Week Editor',
 		'Note Skin Editor',
 		'Note Splash Editor',
+		'Converters',
 		'Dialogue Editor',
 		'Dialogue Portrait Editor',
 		'Menu Character Editor'
@@ -111,8 +111,6 @@ class EditorsMenus extends MusicBeatState
 			{
 				case 'Chart Editor':
 					LoadingState.loadAndSwitchState(new ChartingState(), false);
-				case 'Chart Converter':
-					MusicBeatState.switchState(new ChartConverterState());
 				case 'Character Editor':
 					LoadingState.loadAndSwitchState(new CharacterEditorState(Character.DEFAULT_CHARACTER, false));
 				case 'Stage Editor':
@@ -129,6 +127,8 @@ class EditorsMenus extends MusicBeatState
 					LoadingState.loadAndSwitchState(new DialogueCharacterEditorState(), false);
 				case 'Note Splash Editor':
 					MusicBeatState.switchState(new NoteSplashEditorState());
+				case 'Converters':
+					MusicBeatState.switchState(new funkin.utils.states.ConvertersState());
 			}
 			FlxG.sound.music.volume = 0;
 			FreeplayState.destroyFreeplayVocals();

@@ -1,0 +1,102 @@
+#if !macro
+#if DISCORD_ALLOWED
+import funkin.utils.api.DiscordAPI; // New Discord API
+#end
+
+// Psych
+#if LUA_ALLOWED
+import llua.*;
+import llua.Lua;
+#end
+
+#if ACHIEVEMENTS_ALLOWED
+import funkin.data.achievements.Achievements;
+#end
+
+#if sys
+import sys.*;
+import sys.io.*;
+#elseif js
+import js.html.*;
+#end
+
+// New Souce Code folders
+import funkin.data.ClientPrefs;
+import funkin.Paths;
+import funkin.play.PlayState;
+import funkin.play.Difficulty;
+import funkin.stages.BaseStage;
+import funkin.stages.BGSprite;
+import funkin.states.LoadingState;
+import funkin.states.MusicBeatState;
+import funkin.utils.Controls;
+import funkin.utils.CoolUtil;
+import funkin.utils.substates.MusicBeatSubstate;
+import funkin.utils.CustomFadeTransition;
+import funkin.utils.Conductor;
+import funkin.utils.Language;
+import funkin.utils.Alphabet;
+import funkin.menus.MainMenuState;
+
+#if MODS_ALLOWED
+import funkin.modding.Mods;
+#end
+
+#if LUA_ALLOWED
+import funkin.modding.scripting.FunkinLua;
+import funkin.modding.scripting.psychlua.*;
+#end
+
+import funkin.modding.ModsMenuState;
+import funkin.states.options.OptionsState;
+import funkin.states.TitleState;
+import funkin.utils.states.CreditsState;
+import funkin.menus.StoryMenuState as StoryModeState;
+
+#if PSYCH_ALLOWED
+import funkin.utils.engine.psych.ui.*; // Psych UI'S elements
+#end
+
+#if flxanimate
+import funkin.utils.engine.psych.PsychFlxAnimate as FlxAnimate;
+import flxanimate.*;
+#end
+
+#if PICO_ALLOWED
+import lucas.states.funkin.scripts.*;
+import lucas.states.vslice.scripts.*;
+#end
+
+// Flixel News and openfl
+import flixel.sound.FlxSound;
+import flixel.FlxG;
+import flixel.FlxSprite;
+import flixel.FlxCamera;
+import flixel.util.FlxDestroyUtil;
+import flixel.math.FlxMath;
+import flixel.math.FlxPoint;
+import flixel.util.FlxColor;
+import flixel.util.FlxTimer;
+import flixel.text.FlxText;
+import flixel.tweens.FlxEase;
+import flixel.tweens.FlxTween;
+import flixel.group.FlxSpriteGroup;
+import flixel.group.FlxGroup.FlxTypedGroup;
+import flixel.addons.transition.FlxTransitionableState;
+import flixel.system.FlxAssets.FlxShader;
+import flixel.addons.display.FlxGridOverlay;
+import flixel.FlxBasic;
+import flixel.FlxObject;
+import flixel.FlxSubState;
+import flixel.util.FlxSort;
+import flixel.util.FlxStringUtil;
+import flixel.util.FlxSave;
+import flixel.input.keyboard.FlxKey;
+import flixel.animation.FlxAnimationController;
+import openfl.media.Sound;
+
+// News Limes
+import lime.utils.Assets;
+
+using StringTools;
+#end

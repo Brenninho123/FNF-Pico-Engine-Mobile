@@ -1,11 +1,11 @@
 package funkin.play;
 
 import funkin.stages.StageData;
-import funkin.data.WeekData;
-import funkin.play.songs.Song;
+import funkin.play.Song;
 import funkin.play.Rating;
 import funkin.play.Highscore;
-import funkin.data.Bar;
+import funkin.data.WeekData;
+import funkin.data.objects.Bar;
 import funkin.data.objects.HealthIcon;
 
 import lime.utils.Assets;
@@ -32,14 +32,13 @@ import openfl.filters.ShaderFilter;
 import funkin.play.shaders.ErrorHandledShader;
 import funkin.data.cutscenes.VideoSprite;
 import funkin.data.notes.Note.EventNote;
-import funkin.states.data.menus.freeplay.FreeplayState;
-import funkin.states.data.menus.MainMenuState;
-import funkin.utils.engine.preloads.StagesEnignePreload; // New Preload Folder for stages
-import funkin.utils.engine.preloads.StagesVslicePreload; // New Preload Folder for stages
+import funkin.menus.FreeplayState;
+import funkin.menus.MainMenuState;
+import funkin.utils.engine.pico.preloads.StagesEnignePreload; // New Preload Folder for stages
+import funkin.utils.engine.pico.preloads.StagesVslicePreload; // New Preload Folder for stages
 import funkin.data.characters.Character;
-import funkin.data.stages.objects.*;
-import funkin.stages.data.weeks.*;
 import funkin.stages.objects.*;
+import funkin.stages.data.weeks.*;
 import funkin.data.notes.config.NoteTypesConfig;
 
 #if LUA_ALLOWED
@@ -61,7 +60,7 @@ import crowplexus.hscript.Printer;
 #end
 
 // Pico Enigne
-import lucas.states.funkin.scripts.menus.modes.StoryModeState;
+import funkin.menus.StoryMenuState as StoryModeState;
 import lucas.states.funkin.util.funkin.metadata.SongMetadata;
 import lucas.states.funkin.util.funkin.metadata.SongMetadataBridge;
 import lucas.states.funkin.util.funkin.metadata.SongMetadata.SongMetadataStruct;
@@ -161,6 +160,16 @@ class PlayState extends MusicBeatState
 	public static var storyHiddenSongs:Array<String> = [];
 	public static var storyDifficulty:Int = 1;
 
+	public static function loadWeekDifficultiesForCurrentMode(?week:WeekData = null):Void
+	{
+		if(week == null) week = WeekData.getCurrentWeek();
+		Difficulty.loadFromWeek(week, !isStoryMode);
+
+		if(storyDifficulty < 0) storyDifficulty = 0;
+		if(Difficulty.list.length > 0 && storyDifficulty >= Difficulty.list.length)
+			storyDifficulty = Difficulty.list.length - 1;
+	}
+
 	public static function buildStoryPlaylist(week:Dynamic):Array<String>
 	{
 		var songArray:Array<String> = [];
@@ -173,25 +182,93 @@ class PlayState extends MusicBeatState
 	{
 		if(!isStoryMode || storyPlaylist == null || storyPlaylist.length < 1) return;
 
+		reloadStoryHiddenSongsFromCurrentWeek();
 		var hidden:Array<String> = WeekData.parseHiddenStorySongs(storyHiddenSongs);
 		if(hidden.length < 1) return;
 
+		var currentNames:Array<String> = getCurrentStorySongNames();
 		var filtered:Array<String> = [];
 		for (song in storyPlaylist)
 		{
-			if(!storySongInList(song, hidden))
+			if(storySongInList(song, currentNames) || !storySongInList(song, hidden))
 				filtered.push(song);
 		}
 		storyPlaylist = filtered;
 	}
 
-	static function storySongInList(song:String, list:Array<String>):Bool
+	public static function reloadStoryHiddenSongsFromCurrentWeek():Void
 	{
+		if(!isStoryMode) return;
+
+		var week:WeekData = WeekData.getCurrentWeek();
+		if(week != null)
+			storyHiddenSongs = WeekData.parseHiddenStorySongs(week.hideStorySongs);
+	}
+
+	public static function removeCurrentStorySongFromPlaylist():Void
+	{
+		if(storyPlaylist == null || storyPlaylist.length < 1) return;
+
+		var currentNames:Array<String> = getCurrentStorySongNames();
+		for (name in currentNames)
+		{
+			var index:Int = getStoryPlaylistIndex(name);
+			if(index > -1)
+			{
+				storyPlaylist.splice(index, 1);
+				return;
+			}
+		}
+
+		storyPlaylist.shift();
+	}
+
+	static function getCurrentStorySongNames():Array<String>
+	{
+		var names:Array<String> = [];
+		if(SONG != null)
+			addStorySongName(names, SONG.song);
+		addStorySongName(names, Song.loadedSongName);
+		if(storyPlaylist != null && storyPlaylist.length > 0)
+			addStorySongName(names, storyPlaylist[0]);
+		return names;
+	}
+
+	static function getStoryPlaylistIndex(song:String):Int
+	{
+		if(song == null || storyPlaylist == null) return -1;
+
+		for (i in 0...storyPlaylist.length)
+			if(storySongMatches(storyPlaylist[i], song))
+				return i;
+		return -1;
+	}
+
+	static function addStorySongName(list:Array<String>, song:String):Void
+	{
+		if(song == null) return;
+
 		var formattedSong:String = Paths.formatToSongPath(song);
+		if(formattedSong.length < 1) return;
+
 		for (item in list)
 			if(Paths.formatToSongPath(item) == formattedSong)
+				return;
+		list.push(song);
+	}
+
+	static function storySongInList(song:String, list:Array<String>):Bool
+	{
+		for (item in list)
+			if(storySongMatches(song, item))
 				return true;
 		return false;
+	}
+
+	static function storySongMatches(song:String, other:String):Bool
+	{
+		if(song == null || other == null) return false;
+		return Paths.formatToSongPath(song) == Paths.formatToSongPath(other);
 	}
 
 	public static function getSongVariationName(?song:SwagSong = null):String
@@ -205,44 +282,113 @@ class PlayState extends MusicBeatState
 		return Difficulty.getVariationFilePath(getSongVariationName(song));
 	}
 
-	public static function getSongIdWithVariation(songId:String, ?song:SwagSong = null):String
+	public static function getEffectiveSongVariationName(?song:SwagSong = null, ?difficulty:Null<Int>):String
 	{
-		var baseId:String = Paths.formatToSongPath(songId);
-		var variationSuffix:String = getSongVariationFilePath(song);
-		if(variationSuffix.length > 0 && !baseId.endsWith(variationSuffix))
-			return baseId + variationSuffix;
-		return baseId;
+		var difficultyVariation:String = Difficulty.getDifficultyVariationName(difficulty);
+		if(difficultyVariation.length > 0)
+			return difficultyVariation;
+
+		var variationName:String = getSongVariationName(song);
+		if(variationName.length > 0)
+			return variationName;
+		return '';
 	}
 
-	public static function getSongIdWithVariationAndDifficulty(songId:String, ?song:SwagSong = null, ?difficulty:Null<Int>):String
+	public static function getSongIdWithSuffix(songId:String, ?suffix:String):String
 	{
 		var baseId:String = Paths.formatToSongPath(songId);
-		var suffix:String = Difficulty.getVariationAndDifficultyFilePath(getSongVariationName(song), difficulty);
-		if(suffix.length > 0 && !baseId.endsWith(suffix))
+		if(suffix != null && suffix.length > 0 && !baseId.endsWith(suffix))
 			return baseId + suffix;
 		return baseId;
 	}
 
-	public static function getSongIdVariationCandidates(songId:String, ?song:SwagSong = null):Array<String>
+	public static function getCurrentSongBaseId(?song:SwagSong = null):String
+	{
+		var loadedName:String = Song.loadedSongName;
+		if(loadedName != null && loadedName.trim().length > 0)
+			return Paths.formatToSongPath(loadedName);
+
+		if(song == null) song = SONG;
+		return song != null ? Paths.formatToSongPath(song.song) : '';
+	}
+
+	public static function getCurrentSongAssetId(?song:SwagSong = null, ?difficulty:Null<Int>):String
+		return getSongAssetId(getCurrentSongBaseId(song), song, difficulty);
+
+	public static function getSongIdWithVariation(songId:String, ?song:SwagSong = null):String
+	{
+		return getSongIdWithSuffix(songId, getSongVariationFilePath(song));
+	}
+
+	public static function getSongAssetId(songId:String, ?song:SwagSong = null, ?difficulty:Null<Int>):String
+	{
+		var suffix:String = Difficulty.getVariationAndDifficultyFilePath(getEffectiveSongVariationName(song, difficulty), difficulty);
+		return getSongIdWithSuffix(songId, suffix);
+	}
+
+	public static function songAudioExists(songId:String):Bool
+	{
+		if(songId == null) return false;
+		var id:String = Paths.formatToSongPath(songId);
+		return id.length > 0 && Paths.fileExists('$id/Inst.${Paths.SOUND_EXT}', SOUND, false, 'songs');
+	}
+
+	public static function getSongAudioId(songId:String, ?song:SwagSong = null, ?difficulty:Null<Int>):String
+	{
+		var baseId:String = songId != null ? Paths.formatToSongPath(songId) : '';
+		var displayId:String = (song != null && song.song != null) ? Paths.formatToSongPath(song.song) : '';
+		var loadedId:String = (Song.loadedSongName != null && Song.loadedSongName.trim().length > 0) ? Paths.formatToSongPath(Song.loadedSongName) : '';
+		var candidates:Array<String> = [];
+
+		addUniqueCandidate(candidates, getSongAssetId(baseId, song, difficulty));
+		if(displayId.length > 0)
+			addUniqueCandidate(candidates, getSongAssetId(displayId, song, difficulty));
+		addUniqueCandidate(candidates, displayId);
+		addUniqueCandidate(candidates, loadedId);
+		addUniqueCandidate(candidates, baseId);
+
+		for (candidate in candidates)
+			if(songAudioExists(candidate))
+				return candidate;
+
+		return candidates.length > 0 ? candidates[0] : baseId;
+	}
+
+	public static function getSongIdWithVariationAndDifficulty(songId:String, ?song:SwagSong = null, ?difficulty:Null<Int>):String
+	{
+		var suffix:String = Difficulty.getVariationAndDifficultyFilePath(getSongVariationName(song), difficulty);
+		return getSongIdWithSuffix(songId, suffix);
+	}
+
+	public static function getSongIdVariationCandidates(songId:String, ?song:SwagSong = null, ?difficulty:Null<Int>):Array<String>
 	{
 		var baseId:String = Paths.formatToSongPath(songId);
 		var candidates:Array<String> = [];
+		addUniqueCandidate(candidates, getSongAssetId(baseId, song, difficulty));
 		addUniqueCandidate(candidates, getSongIdWithVariation(baseId, song));
 		addUniqueCandidate(candidates, baseId);
 		return candidates;
 	}
 
-	public static function getSongLoadCandidates(songId:String, ?song:SwagSong = null, ?difficulty:Null<Int>):Array<String>
+	public static function getSongLoadCandidates(songId:String, ?song:SwagSong = null, ?difficulty:Null<Int>, ?useCurrentSongVariation:Bool = true):Array<String>
 	{
 		var baseId:String = Paths.formatToSongPath(songId);
-		var variationSuffix:String = getSongVariationFilePath(song);
+		var difficultySuffix:String = Difficulty.getFilePath(difficulty);
+		var effectiveSuffix:String = Difficulty.getVariationAndDifficultyFilePath(getEffectiveSongVariationName(song, difficulty), difficulty);
+		var songVariationSuffix:String = (difficultySuffix.length < 1 && (song != null || useCurrentSongVariation)) ? getSongVariationFilePath(song) : '';
 		var diffSuffix:String = Difficulty.getFilePath(difficulty);
+		var rawDiffName:String = Difficulty.getString(difficulty, false);
+		var rawDiffSuffix:String = Paths.formatToSongPath(rawDiffName) == Paths.formatToSongPath(Difficulty.getDefault()) ? '' : Difficulty.getSuffixFilePath(rawDiffName);
 		var candidates:Array<String> = [];
 
-		if(variationSuffix.length > 0)
-			addUniqueCandidate(candidates, baseId + variationSuffix);
+		if(effectiveSuffix.length > 0)
+			addUniqueCandidate(candidates, getSongIdWithSuffix(baseId, effectiveSuffix));
+		if(songVariationSuffix.length > 0)
+			addUniqueCandidate(candidates, getSongIdWithSuffix(baseId, songVariationSuffix));
 		if(diffSuffix.length > 0)
-			addUniqueCandidate(candidates, baseId + diffSuffix);
+			addUniqueCandidate(candidates, getSongIdWithSuffix(baseId, diffSuffix));
+		if(rawDiffSuffix.length > 0)
+			addUniqueCandidate(candidates, getSongIdWithSuffix(baseId, rawDiffSuffix));
 		addUniqueCandidate(candidates, baseId);
 		return candidates;
 	}
@@ -251,21 +397,25 @@ class PlayState extends MusicBeatState
 	{
 		var variationSuffix:String = getSongVariationFilePath(song);
 		var diffSuffix:String = Difficulty.getFilePath(difficulty);
+		var rawDiffName:String = Difficulty.getString(difficulty, false);
+		var rawDiffSuffix:String = Paths.formatToSongPath(rawDiffName) == Paths.formatToSongPath(Difficulty.getDefault()) ? '' : Difficulty.getSuffixFilePath(rawDiffName);
 		var candidates:Array<String> = [];
 
 		if(variationSuffix.length > 0)
 			addUniqueCandidate(candidates, 'events' + variationSuffix);
 		if(diffSuffix.length > 0)
 			addUniqueCandidate(candidates, 'events' + diffSuffix);
+		if(rawDiffSuffix.length > 0)
+			addUniqueCandidate(candidates, 'events' + rawDiffSuffix);
 		addUniqueCandidate(candidates, 'events');
 		return candidates;
 	}
 
-	public static function loadSongWithVariationFallback(songId:String, ?song:SwagSong = null, ?difficulty:Null<Int>):SwagSong
+	public static function loadSongWithVariationFallback(songId:String, ?song:SwagSong = null, ?difficulty:Null<Int>, ?useCurrentSongVariation:Bool = true):SwagSong
 	{
 		var baseId:String = Paths.formatToSongPath(songId);
 		var lastError:Dynamic = null;
-		for (candidate in getSongLoadCandidates(baseId, song, difficulty))
+		for (candidate in getSongLoadCandidates(baseId, song, difficulty, useCurrentSongVariation))
 		{
 			try
 			{
@@ -465,6 +615,8 @@ class PlayState extends MusicBeatState
 
 		Conductor.mapBPMChanges(SONG);
 		Conductor.bpm = SONG.bpm;
+		loadWeekDifficultiesForCurrentMode();
+		reloadStoryHiddenSongsFromCurrentWeek();
 
 		// Pico Engine — carrega e aplica o metadata V-Slice da música atual
 		if(SONG.variation != null)
@@ -472,9 +624,12 @@ class PlayState extends MusicBeatState
 			SONG.variation = Difficulty.getSuffixName(SONG.variation);
 			if(SONG.variation.length < 1) SONG.variation = null;
 		}
+		var difficultyVariation:String = Difficulty.getDifficultyVariationName(storyDifficulty);
+		if(difficultyVariation.length > 0)
+			SONG.variation = difficultyVariation;
 
 		var _baseSongId:String = Paths.formatToSongPath(Song.loadedSongName ?? SONG.song);
-		var _songId:String = getSongIdWithVariation(_baseSongId, SONG);
+		var _songId:String = getSongAssetId(_baseSongId, SONG, storyDifficulty);
 		currentSongMeta = SongMetadata.loadFromPath(_songId);
 		if(currentSongMeta == null && _songId != _baseSongId)
 		{
@@ -576,6 +731,7 @@ class PlayState extends MusicBeatState
 		boyfriend = new Character(0, 0, SONG.player1, true);
 		startCharacterPos(boyfriend);
 		boyfriendGroup.add(boyfriend);
+		GameOverState.resetVariables();
 		
 		if(stageData.objects != null && stageData.objects.length > 0)
 		{
@@ -753,7 +909,7 @@ class PlayState extends MusicBeatState
 
 		// SONG SPECIFIC SCRIPTS
 		#if (LUA_ALLOWED || HSCRIPT_ALLOWED)
-		for (scriptSongName in getSongIdVariationCandidates(songName, SONG))
+		for (scriptSongName in getSongIdVariationCandidates(songName, SONG, storyDifficulty))
 			for (folder in Mods.directoriesWithFile(Paths.getSharedPath(), 'scripts/songs/$scriptSongName/'))
 				for (file in FileSystem.readDirectory(folder))
 				{
@@ -786,7 +942,13 @@ class PlayState extends MusicBeatState
 		if(!ClientPrefs.data.ghostTapping) for (i in 1...4) Paths.sound('missnote$i');
 		Paths.image('alphabet');
 
-		if (PauseState.songName != null)
+		var pauseSong:String = (SONG != null ? SONG.pauseSong : null);
+		if (pauseSong != null && pauseSong.trim().length > 0)
+		{
+			var formattedPauseSong:String = Paths.formatToSongPath(pauseSong);
+			if(formattedPauseSong != 'none') Paths.music(formattedPauseSong);
+		}
+		else if (PauseState.songName != null)
 			Paths.music(PauseState.songName);
 		else if(Paths.formatToSongPath(ClientPrefs.data.pauseMusic) != 'none')
 			Paths.music(Paths.formatToSongPath(ClientPrefs.data.pauseMusic));
@@ -879,6 +1041,31 @@ class PlayState extends MusicBeatState
 			FlxColor.fromRGB(boyfriend.healthColorArray[0], boyfriend.healthColorArray[1], boyfriend.healthColorArray[2]));
 	}
 
+	private function getHealthIconPath(iconName:String):String {
+		var icon:String = iconName != null ? iconName.trim() : '';
+		if(icon.length < 1) icon = 'face';
+
+		var paths:Array<String> = [
+			'icons/' + icon,
+			'icons/baseGame/' + icon,
+			'icons/baseGame/icon-' + icon,
+			'icons/icon-' + icon,
+			'icons/icon-face'
+		];
+
+		for(path in paths)
+			if(Paths.fileExists('images/' + path + '.png', IMAGE))
+				return path;
+
+		return 'icons/icon-face';
+	}
+
+	private function precacheHealthIcon(iconValue:String):Void {
+		var iconName:String = iconValue != null ? iconValue.split(',')[0].trim() : '';
+		if(iconName.length > 0)
+			Paths.image(getHealthIconPath(iconName));
+	}
+
 	private function changeHealthIcon(target:String, iconValue:String):Void {
 		var split:Array<String> = iconValue != null ? iconValue.split(',') : [''];
 		var iconName:String = split.shift().trim();
@@ -887,12 +1074,12 @@ class PlayState extends MusicBeatState
 		if(iconName.length < 1) iconName = 'face';
 
 		switch(target.toLowerCase().trim()) {
-			case 'bf' | 'boyfriend' | 'player' | '0':
+			case 'bf' | 'boyfriend' | 'player' | 'p1' | '0':
 				iconP1.changeIcon(iconName, true, boyfriend.animatedIcon);
 				boyfriend.healthIcon = iconP1.getCharacter();
 				if(iconColor != null) setHealthColorArray(boyfriend.healthColorArray, iconColor);
 
-			case 'dad' | 'opponent' | 'enemy' | '1':
+			case 'dad' | 'opponent' | 'enemy' | 'p2' | '1':
 				iconP2.changeIcon(iconName, true, dad.animatedIcon);
 				dad.healthIcon = iconP2.getCharacter();
 				if(iconColor != null) setHealthColorArray(dad.healthColorArray, iconColor);
@@ -922,6 +1109,47 @@ class PlayState extends MusicBeatState
 		}
 
 		if(iconColor != null) reloadHealthBarColors();
+	}
+
+	private function hasEventFlag(flags:String, flag:String):Bool {
+		if(flags == null) return false;
+
+		var lowerFlags:String = flags.toLowerCase();
+		for(part in lowerFlags.split(','))
+			for(value in part.split(' '))
+				if(value.trim() == flag)
+					return true;
+
+		return false;
+	}
+
+	private function getStageNameFromEventValues(value1:String, value2:String):String {
+		var stageName:String = value1 != null ? value1.trim() : '';
+		if(stageName.length < 1 && value2 != null)
+			stageName = value2.trim();
+
+		return stageName;
+	}
+
+	private function runChangeStageEvent(value1:String, value2:String):Void {
+		var stageName:String = value1 != null ? value1.trim() : '';
+		var flags:String = value2 != null ? value2.trim() : '';
+
+		if(stageName.length < 1) {
+			stageName = flags;
+			flags = '';
+		}
+
+		if(stageName.length < 1) {
+			#if (LUA_ALLOWED || HSCRIPT_ALLOWED)
+			addTextToDebug('Change Bg: missing stage name', FlxColor.RED);
+			#else
+			FlxG.log.warn('Change Bg: missing stage name');
+			#end
+			return;
+		}
+
+		changeStage(stageName, !hasEventFlag(flags, 'nolua'), !hasEventFlag(flags, 'noposition'));
 	}
 
 	private function parseIconColor(values:Array<String>):Null<FlxColor> {
@@ -1686,7 +1914,8 @@ class PlayState extends MusicBeatState
 		var songData = SONG;
 		Conductor.bpm = songData.bpm;
 
-		curSong = songData.song;
+		var songAssetId:String = getSongAudioId(songData.song, songData, storyDifficulty);
+		curSong = songAssetId;
 
 		vocals = new FlxSound();
 		opponentVocals = new FlxSound();
@@ -1694,10 +1923,10 @@ class PlayState extends MusicBeatState
 		{
 			if (songData.needsVoices)
 			{
-				var playerVocals = Paths.voices(songData.song, (boyfriend.vocalsFile == null || boyfriend.vocalsFile.length < 1) ? 'Player' : boyfriend.vocalsFile);
-				vocals.loadEmbedded(playerVocals != null ? playerVocals : Paths.voices(songData.song));
+				var playerVocals = Paths.voices(songAssetId, (boyfriend.vocalsFile == null || boyfriend.vocalsFile.length < 1) ? 'Player' : boyfriend.vocalsFile);
+				vocals.loadEmbedded(playerVocals != null ? playerVocals : Paths.voices(songAssetId));
 				
-				var oppVocals = Paths.voices(songData.song, (dad.vocalsFile == null || dad.vocalsFile.length < 1) ? 'Opponent' : dad.vocalsFile);
+				var oppVocals = Paths.voices(songAssetId, (dad.vocalsFile == null || dad.vocalsFile.length < 1) ? 'Opponent' : dad.vocalsFile);
 				if(oppVocals != null && oppVocals.length > 0) opponentVocals.loadEmbedded(oppVocals);
 			}
 		}
@@ -1713,7 +1942,7 @@ class PlayState extends MusicBeatState
 		inst = new FlxSound();
 		try
 		{
-			inst.loadEmbedded(Paths.inst(songData.song));
+			inst.loadEmbedded(Paths.inst(songAssetId));
 		}
 		catch (e:Dynamic) {}
 		FlxG.sound.list.add(inst);
@@ -1901,13 +2130,11 @@ class PlayState extends MusicBeatState
 			case 'Play Sound':
 				Paths.sound(event.value1); //Precache sound
 
-			case 'Change Icon':
-				var iconName:String = event.value2 != null ? event.value2.split(',')[0].trim() : '';
-				if(iconName.length > 0)
-					Paths.image('icons/icon-' + iconName);
+			case 'Change Icon' | 'change icon':
+				precacheHealthIcon(event.value2);
 
-			case 'Change Stage' | 'Change Stages' | 'Change Bg':
-				var stageName:String = event.value1 != null && event.value1.trim().length > 0 ? event.value1.trim() : (event.value2 != null ? event.value2.trim() : '');
+			case 'Change Stage' | 'Change Stages' | 'Change Bg' | 'Change BG' | 'change bg':
+				var stageName:String = getStageNameFromEventValues(event.value1, event.value2);
 				if(stageName.length > 0) {
 					var stageData:StageFile = StageData.getStageFile(stageName);
 					if(stageData.objects != null && stageData.objects.length > 0)
@@ -2333,8 +2560,8 @@ class PlayState extends MusicBeatState
 		var newPercent:Null<Float> = FlxMath.remapToRange(FlxMath.bound(healthBar.valueFunction(), healthBar.bounds.min, healthBar.bounds.max), healthBar.bounds.min, healthBar.bounds.max, 0, 100);
 		healthBar.percent = (newPercent != null ? newPercent : 0);
 
-		if(!iconP1.animatedIcon && iconP1.animation != null && iconP1.animation.curAnim != null) iconP1.animation.curAnim.curFrame = (healthBar.percent < 20) ? 1 : 0; //If health is under 20%, change player icon to frame 1 (losing icon), otherwise, frame 0 (normal)
-		if(!iconP2.animatedIcon && iconP2.animation != null && iconP2.animation.curAnim != null) iconP2.animation.curAnim.curFrame = (healthBar.percent > 80) ? 1 : 0; //If health is over 80%, change opponent icon to frame 1 (losing icon), otherwise, frame 0 (normal)
+		if(iconP1 != null) iconP1.updateHealthState(healthBar.percent, false);
+		if(iconP2 != null) iconP2.updateHealthState(healthBar.percent, true);
 		return health;
 	}
 
@@ -2635,6 +2862,7 @@ class PlayState extends MusicBeatState
 							boyfriend = boyfriendMap.get(value2);
 							boyfriend.alpha = lastAlpha;
 							iconP1.changeIcon(boyfriend.healthIcon, true, boyfriend.animatedIcon);
+							GameOverState.resetVariables();
 						}
 						setOnScripts('boyfriendName', boyfriend.curCharacter);
 
@@ -2679,8 +2907,11 @@ class PlayState extends MusicBeatState
 				}
 				reloadHealthBarColors();
 
-			case 'Change Icon':
+			case 'Change Icon' | 'change icon':
 				changeHealthIcon(value1, value2);
+
+			case 'Change Stage' | 'Change Stages' | 'Change Bg' | 'Change BG' | 'change bg':
+				runChangeStageEvent(value1, value2);
 
 			case 'Change Scroll Speed':
 				if (songSpeedType != "constant")
@@ -2870,7 +3101,7 @@ class PlayState extends MusicBeatState
 			var percent:Float = ratingPercent;
 			if(Math.isNaN(percent)) percent = 0;
 			var scoreSongName:String = Song.loadedSongName != null ? Song.loadedSongName : SONG.song;
-			Highscore.saveScore(getSongIdWithVariation(scoreSongName, SONG), songScore, storyDifficulty, percent);
+			Highscore.saveScore(scoreSongName, songScore, storyDifficulty, percent, getSongVariationName(SONG), WeekData.getCurrentWeek(), !isStoryMode);
 			#end
 			playbackRate = 1;
 
@@ -2885,7 +3116,7 @@ class PlayState extends MusicBeatState
 				campaignScore += songScore;
 				campaignMisses += songMisses;
 
-				storyPlaylist.remove(storyPlaylist[0]);
+				removeCurrentStorySongFromPlaylist();
 				removeHiddenStorySongsFromPlaylist();
 
 				if (storyPlaylist.length <= 0)
@@ -2900,7 +3131,7 @@ class PlayState extends MusicBeatState
 					// if ()
 					if(!ClientPrefs.getGameplaySetting('practice') && !ClientPrefs.getGameplaySetting('botplay')) {
 						StoryModeState.weekCompleted.set(WeekData.weeksList[storyWeek], true);
-						Highscore.saveWeekScore(WeekData.getWeekFileName(), campaignScore, storyDifficulty);
+						Highscore.saveWeekScore(WeekData.getWeekFileName(), campaignScore, storyDifficulty, WeekData.getCurrentWeek(), false);
 
 						FlxG.save.data.weekCompleted = StoryModeState.weekCompleted;
 						FlxG.save.flush();

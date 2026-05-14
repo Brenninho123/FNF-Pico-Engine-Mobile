@@ -1,5 +1,7 @@
 package funkin.play;
 
+import funkin.data.WeekData;
+
 class Highscore
 {
 	public static var weekScores:Map<String, Int> = new Map();
@@ -8,23 +10,23 @@ class Highscore
 	public static var songMisses:Map<String, Int> = new Map<String, Int>();
 	public static var songDeaths:Map<String, Int> = new Map<String, Int>();
 
-	public static function resetSong(song:String, diff:Int = 0):Void
+	public static function resetSong(song:String, diff:Int = 0, ?variation:String = null, ?week:WeekData = null, ?freeplay:Bool = false):Void
 	{
-		var daSong:String = formatSong(song, diff);
+		var daSong:String = formatScore(song, diff, variation, week, freeplay);
 		setScore(daSong, 0);
 		setRating(daSong, 0);
 	}
 
-	public static function resetWeek(week:String, diff:Int = 0):Void
+	public static function resetWeek(week:String, diff:Int = 0, ?weekData:WeekData = null, ?freeplay:Bool = false):Void
 	{
-		var daWeek:String = formatSong(week, diff);
+		var daWeek:String = formatScore(week, diff, null, weekData, freeplay);
 		setWeekScore(daWeek, 0);
 	}
 
-	public static function saveScore(song:String, score:Int = 0, ?diff:Int = 0, ?rating:Float = -1):Void
+	public static function saveScore(song:String, score:Int = 0, ?diff:Int = 0, ?rating:Float = -1, ?variation:String = null, ?week:WeekData = null, ?freeplay:Bool = false):Void
 	{
 		if(song == null) return;
-		var daSong:String = formatSong(song, diff);
+		var daSong:String = formatScore(song, diff, variation, week, freeplay);
 
 		if (songScores.exists(daSong))
 		{
@@ -41,9 +43,9 @@ class Highscore
 		}
 	}
 
-	public static function saveWeekScore(week:String, score:Int = 0, ?diff:Int = 0):Void
+	public static function saveWeekScore(week:String, score:Int = 0, ?diff:Int = 0, ?weekData:WeekData = null, ?freeplay:Bool = false):Void
 	{
-		var daWeek:String = formatSong(week, diff);
+		var daWeek:String = formatScore(week, diff, null, weekData, freeplay);
 
 		if (weekScores.exists(daWeek))
 		{
@@ -93,54 +95,85 @@ class Highscore
 		FlxG.save.flush();
 	}
 
-	public static function formatSong(song:String, diff:Int):String
+	public static function formatSong(song:String, diff:Int, ?variation:String = null, ?week:WeekData = null, ?freeplay:Bool = false):String
 	{
-		return Paths.formatToSongPath(song) + Difficulty.getFilePath(diff);
+		loadDifficultyListForMode(week, freeplay);
+
+		var daSong:String = Paths.formatToSongPath(song);
+		return appendSuffix(daSong, Difficulty.getVariationAndDifficultyFilePath(variation, diff));
 	}
 
-	public static function getScore(song:String, diff:Int):Int
+	public static function formatScore(song:String, diff:Int, ?variation:String = null, ?week:WeekData = null, ?freeplay:Bool = false):String
 	{
-		var daSong:String = formatSong(song, diff);
+		loadDifficultyListForMode(week, freeplay);
+
+		var daSong:String = Paths.formatToSongPath(song);
+		var difficultyVariation:String = Difficulty.getDifficultyVariationName(diff);
+		if(difficultyVariation.length > 0)
+			return appendSuffix(daSong, Difficulty.getVariationFilePath(difficultyVariation));
+
+		daSong = appendSuffix(daSong, Difficulty.getVariationFilePath(variation));
+		daSong = appendSuffix(daSong, Difficulty.getFilePath(diff));
+		return daSong;
+	}
+
+	public static function getScore(song:String, diff:Int, ?variation:String = null, ?week:WeekData = null, ?freeplay:Bool = false):Int
+	{
+		var daSong:String = formatScore(song, diff, variation, week, freeplay);
 		if (!songScores.exists(daSong))
 			setScore(daSong, 0);
 
 		return songScores.get(daSong);
 	}
 
-	public static function getRating(song:String, diff:Int):Float
+	public static function getRating(song:String, diff:Int, ?variation:String = null, ?week:WeekData = null, ?freeplay:Bool = false):Float
 	{
-		var daSong:String = formatSong(song, diff);
+		var daSong:String = formatScore(song, diff, variation, week, freeplay);
 		if (!songRating.exists(daSong))
 			setRating(daSong, 0);
 
 		return songRating.get(daSong);
 	}
 
-	public static function getMisses(song:String, diff:Int):Int
+	public static function getMisses(song:String, diff:Int, ?variation:String = null, ?week:WeekData = null, ?freeplay:Bool = false):Int
 	{
-		var daSong:String = formatSong(song, diff);
+		var daSong:String = formatScore(song, diff, variation, week, freeplay);
 		if (!songMisses.exists(daSong))
 			setMisses(daSong, 0);
 
 		return songMisses.get(daSong);
 	}
 
-	public static function getDeaths(song:String, diff:Int):Int
+	public static function getDeaths(song:String, diff:Int, ?variation:String = null, ?week:WeekData = null, ?freeplay:Bool = false):Int
 	{
-		var daSong:String = formatSong(song, diff);
+		var daSong:String = formatScore(song, diff, variation, week, freeplay);
 		if (!songDeaths.exists(daSong))
 			setDeaths(daSong, 0);
 
 		return songDeaths.get(daSong);
 	}
 
-	public static function getWeekScore(week:String, diff:Int):Int
+	public static function getWeekScore(week:String, diff:Int, ?weekData:WeekData = null, ?freeplay:Bool = false):Int
 	{
-		var daWeek:String = formatSong(week, diff);
+		var daWeek:String = formatScore(week, diff, null, weekData, freeplay);
 		if (!weekScores.exists(daWeek))
 			setWeekScore(daWeek, 0);
 
 		return weekScores.get(daWeek);
+	}
+
+	static function loadDifficultyListForMode(?week:WeekData, ?freeplay:Bool = false):Void
+	{
+		if(week != null)
+			Difficulty.loadFromWeek(week, freeplay);
+	}
+
+	static function appendSuffix(value:String, suffix:String):String
+	{
+		if(value == null) value = '';
+		if(suffix == null || suffix.length < 1 || value.endsWith(suffix))
+			return value;
+		return value + suffix;
 	}
 
 	public static function load():Void

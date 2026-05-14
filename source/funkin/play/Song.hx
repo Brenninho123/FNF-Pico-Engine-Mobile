@@ -22,20 +22,13 @@ typedef SwagSong =
 	var stage:String;
 	var format:String;
 
-	@:optional var gameOverChar:String;
-	@:optional var gameOverSound:String;
-	@:optional var gameOverLoop:String;
-	@:optional var gameOverEnd:String;
+	@:optional var pauseSong:String;
 	
 	@:optional var disableNoteRGB:Bool;
 	@:optional var arrowSkin:String;
 	@:optional var splashSkin:String;
 	@:optional var variation:String;
-	@:optional var player1ArrowSkin:String;
-	@:optional var player2ArrowSkin:String;
-	@:optional var player1SplashSkin:String;
-	@:optional var player2SplashSkin:String;
-
+	
 	@:optional var artist:String;
 	@:optional var charter:String;
 	@:optional var album:String;
@@ -66,16 +59,9 @@ class Song
 	public var splashSkin:String;
 	public var noteStyle:String;
 	public var variation:String;
-	public var player1ArrowSkin:String;
-	public var player2ArrowSkin:String;
-	public var player1SplashSkin:String;
-	public var player2SplashSkin:String;
 	public var artist:String;
 	public var charter:String;
-	public var gameOverChar:String;
-	public var gameOverSound:String;
-	public var gameOverLoop:String;
-	public var gameOverEnd:String;
+	public var pauseSong:String;
 	public var disableNoteRGB:Bool = false;
 	public var speed:Float = 1;
 	public var stage:String;

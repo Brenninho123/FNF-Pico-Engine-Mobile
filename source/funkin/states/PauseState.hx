@@ -2,14 +2,13 @@ package funkin.states;
 
 import funkin.data.WeekData;
 import funkin.play.Highscore;
-import funkin.play.songs.Song;
-import funkin.states.OptionsState;
-import funkin.states.GameplayChangerState;
-import funkin.states.data.menus.freeplay.FreeplayState;	
-import funkin.utils.engine.LocaleUtils; // By PlusEngine
+import funkin.play.Song;
+import funkin.states.options.OptionsState;
+import funkin.utils.states.menus.GameplayChangerState;
+import funkin.menus.FreeplayState;	
+import funkin.utils.engine.pico.LocaleUtils; // By PlusEngine
 
 import flixel.util.FlxStringUtil;
-// import StoryModeState and other mode classes from appropriate locations
 
 class PauseState extends MusicBeatSubstate
 {
@@ -171,11 +170,19 @@ class PauseState extends MusicBeatSubstate
 	
 	function getPauseSong()
 	{
-		var formattedSongName:String = (songName != null ? Paths.formatToSongPath(songName) : '');
-		var formattedPauseMusic:String = Paths.formatToSongPath(ClientPrefs.data.pauseMusic);
-		if(formattedSongName == 'none' || (formattedSongName != 'none' && formattedPauseMusic == 'none')) return null;
+		var songPauseMusic:String = (PlayState.SONG != null ? PlayState.SONG.pauseSong : null);
+		var formattedSongName:String = '';
+		if(songPauseMusic != null && songPauseMusic.trim().length > 0)
+			formattedSongName = Paths.formatToSongPath(songPauseMusic);
+		else if(songName != null)
+			formattedSongName = Paths.formatToSongPath(songName);
 
-		return (formattedSongName != '') ? formattedSongName : formattedPauseMusic;
+		if(formattedSongName == 'none') return null;
+		if(formattedSongName != '') return formattedSongName;
+
+		var formattedPauseMusic:String = Paths.formatToSongPath(ClientPrefs.data.pauseMusic);
+		if(formattedPauseMusic == 'none') return null;
+		return formattedPauseMusic;
 	}
 
 	var holdTime:Float = 0;
@@ -256,7 +263,7 @@ class PauseState extends MusicBeatSubstate
 			if (menuItems == difficultyChoices)
 			{
 				var songLowercase:String = Paths.formatToSongPath(PlayState.SONG.song);
-				var poop:String = Highscore.formatSong(songLowercase, curSelected);
+				var poop:String = Highscore.formatSong(songLowercase, curSelected, PlayState.getSongVariationName(PlayState.SONG), WeekData.getCurrentWeek(), !PlayState.isStoryMode);
 				try
 				{
 					if(menuItems.length - 1 != curSelected && difficultyChoices.contains(daSelected))
@@ -305,7 +312,7 @@ class PauseState extends MusicBeatSubstate
 					PlayState.instance.paused = true;
 					PlayState.instance.vocals.volume = 0;
 					PlayState.instance.canResync = false;
-					openSubState(new funkin.states.GameplayChangerState());
+					openSubState(new GameplayChangerState());
 				case 'Toggle Practice Mode':
 					PlayState.instance.practiceMode = !PlayState.instance.practiceMode;
 					PlayState.changedDifficulty = true;

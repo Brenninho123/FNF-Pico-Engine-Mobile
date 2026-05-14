@@ -1,8 +1,8 @@
 package funkin.data.characters;
 
-import funkin.play.songs.Song;
-import funkin.utils.psych.PsychAnimationController;
+import funkin.play.Song;
 import funkin.stages.data.weeks.week7.objects.*;
+import funkin.utils.engine.psych.PsychAnimationController;
 
 import flixel.util.FlxSort;
 import flixel.util.FlxDestroyUtil;
@@ -13,16 +13,20 @@ import haxe.Json;
 
 typedef CharacterFile = {
 	var animations:Array<AnimArray>;
-	var image:String;
+	@:optional var assetPath:String;
+	@:optional var image:String;
 	var scale:Float;
 	var sing_duration:Float;
-	var healthicon:String;
+	@:optional var healthicon:String;
+	@:optional var HealthIcon:String;
 	@:optional var AnimatedIcon:Bool;
 	@:optional var animatedIcon:Bool;
 	@:optional var animated_icon:Bool;
 
-	var position:Array<Float>;
-	var camera_position:Array<Float>;
+	@:optional var offsets:Array<Float>;
+	@:optional var position:Array<Float>;
+	@:optional var cameraOffsets:Array<Float>;
+	@:optional var camera_position:Array<Float>;
 
 	var flip_x:Bool;
 	var no_antialiasing:Bool;
@@ -31,14 +35,23 @@ typedef CharacterFile = {
 	@:optional var characterType:String;
 	@:optional var character_type:String;
 	@:optional var _editor_isPlayer:Null<Bool>;
+	@:optional var gameOverChar:String;
+	@:optional var gameOverSound:String;
+	@:optional var gameOverLoop:String;
+	@:optional var gameOverEnd:String;
+	@:optional var arrowSkin:String;
+	@:optional var noteStyle:String;
 }
 
 typedef AnimArray = {
+	@:optional var assetPath:String;
 	var anim:String;
 	var name:String;
+	@:optional var prefix:String;
 	var fps:Int;
 	var loop:Bool;
 	var indices:Array<Int>;
+	@:optional var frameIndices:Array<Int>;
 	var offsets:Array<Int>;
 }
 
@@ -80,6 +93,11 @@ class Character extends FlxSprite
 	public var missingText:FlxText;
 	public var hasMissAnimations:Bool = false;
 	public var vocalsFile:String = '';
+	public var gameOverChar:String = '';
+	public var gameOverSound:String = '';
+	public var gameOverLoop:String = '';
+	public var gameOverEnd:String = '';
+	public var noteStyle:String = '';
 
 	//Used on Character Editor
 	public var imageFile:String = '';
@@ -152,11 +170,12 @@ class Character extends FlxSprite
 	public function loadCharacterFile(json:Dynamic)
 	{
 		isAnimateAtlas = false;
+		var assetPath:String = characterString(json.assetPath, characterString(json.image, ''));
+		animationsArray = normalizeAnimations(json.animations);
+		var fullAssetPath:String = collectAnimationAssetPaths(assetPath, animationsArray);
 
 		#if flxanimate
-		var animToFind:String = Paths.getPath('images/' + json.image + '/Animation.json', TEXT);
-		if (#if MODS_ALLOWED FileSystem.exists(animToFind) || #end Assets.exists(animToFind))
-			isAnimateAtlas = true;
+		isAnimateAtlas = Paths.hasAnimateAtlas(fullAssetPath);
 		#end
 
 		scale.set(1, 1);
@@ -164,7 +183,7 @@ class Character extends FlxSprite
 
 		if(!isAnimateAtlas)
 		{
-			frames = Paths.getMultiAtlas(json.image.split(','));
+			frames = Paths.getMultiAtlas(fullAssetPath.split(','));
 		}
 		#if flxanimate
 		else
@@ -173,34 +192,39 @@ class Character extends FlxSprite
 			atlas.showPivot = false;
 			try
 			{
-				Paths.loadAnimateAtlas(atlas, json.image);
+				Paths.loadAnimateAtlas(atlas, fullAssetPath);
 			}
 			catch(e:haxe.Exception)
 			{
-				FlxG.log.warn('Could not load atlas ${json.image}: $e');
+				FlxG.log.warn('Could not load atlas $fullAssetPath: $e');
 				trace(e.stack);
 			}
 		}
 		#end
 
-		imageFile = json.image;
-		jsonScale = json.scale;
-		if(json.scale != 1) {
+		imageFile = assetPath;
+		jsonScale = characterFloat(json.scale, 1);
+		if(jsonScale != 1) {
 			scale.set(jsonScale, jsonScale);
 			updateHitbox();
 		}
 
 		// positioning
-		positionArray = json.position;
-		cameraPosition = json.camera_position;
+		positionArray = normalizePoint(json.offsets != null ? json.offsets : json.position, [0, 0]);
+		cameraPosition = normalizePoint(json.cameraOffsets != null ? json.cameraOffsets : json.camera_position, [0, 0]);
 
 		// data
-		healthIcon = json.healthicon;
+		healthIcon = characterString(json.healthicon, characterString(json.HealthIcon, 'face'));
 		animatedIcon = (json.animatedIcon == true || json.AnimatedIcon == true || json.animated_icon == true);
 		singDuration = json.sing_duration;
 		flipX = (json.flip_x != isPlayer);
 		healthColorArray = (json.healthbar_colors != null && json.healthbar_colors.length > 2) ? json.healthbar_colors : [161, 161, 161];
 		vocalsFile = json.vocals_file != null ? json.vocals_file : '';
+		gameOverChar = characterString(json.gameOverChar, characterString(json.gameOverCharacter, ''));
+		gameOverSound = characterString(json.gameOverSound, '');
+		gameOverLoop = characterString(json.gameOverLoop, '');
+		gameOverEnd = characterString(json.gameOverEnd, '');
+		noteStyle = characterString(json.noteStyle, characterString(json.arrowSkin, ''));
 		originalFlipX = (json.flip_x == true);
 		editorIsPlayer = json._editor_isPlayer;
 		editorCharacterType = json.characterType != null ? json.characterType : json.character_type;
@@ -210,7 +234,6 @@ class Character extends FlxSprite
 		antialiasing = ClientPrefs.data.antialiasing ? !noAntialiasing : false;
 
 		// animations
-		animationsArray = json.animations;
 		if(animationsArray != null && animationsArray.length > 0) {
 			for (anim in animationsArray) {
 				var animAnim:String = '' + anim.anim;
@@ -244,6 +267,129 @@ class Character extends FlxSprite
 		if(isAnimateAtlas) copyAtlasValues();
 		#end
 		//trace('Loaded file to character ' + curCharacter);
+	}
+
+	public static function collectAnimationAssetPaths(assetPath:String, animations:Array<AnimArray>):String
+	{
+		var paths:Array<String> = [];
+		addUniqueAssetPath(paths, assetPath);
+
+		if(animations != null)
+			for (anim in animations)
+				addUniqueAssetPath(paths, anim.assetPath);
+
+		return paths.join(',');
+	}
+
+	static function addUniqueAssetPath(paths:Array<String>, path:String):Void
+	{
+		if(path == null) return;
+
+		for (part in path.split(','))
+		{
+			var clean:String = Paths.normalizeAssetPath(part);
+			if(clean.length > 0 && !paths.contains(clean))
+				paths.push(clean);
+		}
+	}
+
+	static function normalizeAnimations(value:Dynamic):Array<AnimArray>
+	{
+		var normalized:Array<AnimArray> = [];
+		if(value == null) return normalized;
+
+		var rawAnimations:Array<Dynamic> = cast value;
+		for (raw in rawAnimations)
+		{
+			var legacyAnim:Dynamic = getDynamicField(raw, 'anim');
+			var newName:Dynamic = getDynamicField(raw, 'name');
+			var prefix:Dynamic = getDynamicField(raw, 'prefix');
+			var assetPath:Dynamic = getDynamicField(raw, 'assetPath');
+			var frameIndices:Dynamic = getDynamicField(raw, 'frameIndices');
+			if(frameIndices == null) frameIndices = getDynamicField(raw, 'indices');
+
+			var animName:String = legacyAnim != null ? Std.string(legacyAnim) : characterString(newName, '');
+			var animPrefix:String = prefix != null ? Std.string(prefix) : (legacyAnim != null ? characterString(newName, animName) : animName);
+
+			normalized.push({
+				assetPath: assetPath != null ? Std.string(assetPath) : '',
+				anim: animName,
+				name: animPrefix,
+				fps: Math.round(characterFloat(getDynamicField(raw, 'fps'), 24)),
+				loop: getDynamicField(raw, 'loop') == true,
+				indices: normalizeIntArray(frameIndices),
+				offsets: normalizeIntPoint(getDynamicField(raw, 'offsets'), [0, 0])
+			});
+		}
+
+		return normalized;
+	}
+
+	static function getDynamicField(value:Dynamic, field:String):Dynamic
+	{
+		return value != null && Reflect.hasField(value, field) ? Reflect.field(value, field) : null;
+	}
+
+	static function characterString(value:Dynamic, fallback:String):String
+	{
+		return value == null ? fallback : Std.string(value);
+	}
+
+	static function normalizePoint(value:Dynamic, fallback:Array<Float>):Array<Float>
+	{
+		if(value == null) return fallback.copy();
+
+		if(Std.isOfType(value, Array))
+		{
+			var array:Array<Dynamic> = cast value;
+			return [
+				array.length > 0 ? characterFloat(array[0], fallback[0]) : fallback[0],
+				array.length > 1 ? characterFloat(array[1], fallback[1]) : fallback[1]
+			];
+		}
+
+		var text:String = Std.string(value).replace(';', ',').replace('|', ',');
+		var split:Array<String> = text.contains(',') ? text.split(',') : text.split(' ');
+		if(split.length > 1)
+			return [characterFloat(split[0], fallback[0]), characterFloat(split[1], fallback[1])];
+
+		return fallback.copy();
+	}
+
+	static function normalizeIntPoint(value:Dynamic, fallback:Array<Int>):Array<Int>
+	{
+		var point:Array<Float> = normalizePoint(value, [fallback[0], fallback[1]]);
+		return [Math.round(point[0]), Math.round(point[1])];
+	}
+
+	static function normalizeIntArray(value:Dynamic):Array<Int>
+	{
+		var result:Array<Int> = [];
+		if(value == null) return result;
+
+		if(Std.isOfType(value, Array))
+		{
+			for (item in (cast value:Array<Dynamic>))
+			{
+				var parsed:Null<Int> = Std.parseInt(Std.string(item).trim());
+				if(parsed != null) result.push(parsed);
+			}
+			return result;
+		}
+
+		for (item in Std.string(value).split(','))
+		{
+			var parsed:Null<Int> = Std.parseInt(item.trim());
+			if(parsed != null) result.push(parsed);
+		}
+		return result;
+	}
+
+	static function characterFloat(value:Dynamic, fallback:Float):Float
+	{
+		if(value == null) return fallback;
+		var parsed:Float = Std.parseFloat(Std.string(value).trim());
+		return Math.isNaN(parsed) ? fallback : parsed;
 	}
 
 	override function update(elapsed:Float)

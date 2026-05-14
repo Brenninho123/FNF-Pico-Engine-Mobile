@@ -23,11 +23,11 @@ import haxe.io.Bytes;
 import funkin.data.editors.content.MetaNote;
 import funkin.data.editors.content.VSlice;
 import funkin.data.editors.content.Prompt;
-import funkin.utils.psych.PsychJsonPrinter;
+import funkin.utils.engine.psych.PsychJsonPrinter;
 import funkin.data.editors.content.*;
 
-import funkin.play.songs.Song;
-import funkin.data.Difficulty;
+import funkin.play.Song;
+import funkin.play.Difficulty;
 import funkin.stages.StageData;
 
 import funkin.data.notes.Note;
@@ -91,6 +91,7 @@ class ChartingState extends MusicBeatState implements PsychUIEventHandler.PsychU
 		['Change Character', "Value 1: Character to change (Dad, BF, GF)\nValue 2: New character's name"],
 		['Change Icon', "Value 1: Icon to change (Dad, BF, GF)\nValue 2: New Icon's name\nOptional color: icon, #RRGGBB or icon, R, G, B"],
 		['Change Stage', "Value 1: Stage name from data/stages/*.json\nValue 2: Optional flags: noLua, noPosition"],
+		['change bg', "Godot-style stage/background change.\nValue 1: Stage name from data/stages/*.json\nValue 2: Optional flags: noLua, noPosition"],
 		['Change Scroll Speed', "Value 1: Scroll Speed Multiplier (1 is default)\nValue 2: Time it takes to change fully in seconds."],
 		['Set Property', "Value 1: Variable name\nValue 2: New value"],
 		['Play Sound', "Value 1: Sound file name\nValue 2: Volume (Default: 1), ranges from 0 to 1"]
@@ -481,20 +482,10 @@ class ChartingState extends MusicBeatState implements PsychUIEventHandler.PsychU
 
 		// CHARACTERS FOR THE DROP DOWNS
 		var allCharacters:Array<String> = loadFileList('data/characters/', 'data/characterList.txt');
-		var characterGameOverList = allCharacters.filter((name:String) -> (name.endsWith('-dead') || name.endsWith('-death')));
 		var characterList = allCharacters.filter((name:String) -> (!name.endsWith('-dead') && !name.endsWith('-death')));
 		playerDropDown.list = characterList;
 		opponentDropDown.list = characterList;
 		girlfriendDropDown.list = characterList;
-
-		characterGameOverList = allCharacters.filter((name:String) -> (name.endsWith('-dead') || name.endsWith('-death')));
-		characterGameOverList.insert(0, '');
-		characterGameOverList.sort(function(a:String, b:String)
-		{
-			if((a == '' || a.endsWith('-dead') || a.endsWith('-death')) && !(b == '' || b.endsWith('-dead') || b.endsWith('-death'))) return -1; //Prioritize "-dead" or "-death" characters
-			return 0;
-		});
-		gameOverCharDropDown.list = characterGameOverList;
 
 		stageDropDown.list = loadFileList('data/stages/', 'data/stageList.txt');
 		if(noteSkinDropDown != null)
@@ -683,10 +674,8 @@ class ChartingState extends MusicBeatState implements PsychUIEventHandler.PsychU
 		StageData.loadDirectory(PlayState.SONG);
 
 		// DATA TAB
-		gameOverCharDropDown.selectedLabel = PlayState.SONG.gameOverChar;
-		gameOverSndInputText.text = PlayState.SONG.gameOverSound;
-		gameOverLoopInputText.text = PlayState.SONG.gameOverLoop;
-		gameOverRetryInputText.text = PlayState.SONG.gameOverEnd;
+		removeSongGameOverFields();
+		pauseSongInputText.text = PlayState.SONG.pauseSong != null ? PlayState.SONG.pauseSong : '';
 
 		noRGBCheckBox.checked = (PlayState.SONG.disableNoteRGB == true);
 
@@ -1842,7 +1831,7 @@ class ChartingState extends MusicBeatState implements PsychUIEventHandler.PsychU
 		}
 
 		var chartPath:String = Song.chartPath != null ? Song.chartPath.replace('\\', '/') : '';
-		var songName:String = Paths.formatToSongPath(PlayState.SONG.song);
+		var songName:String = getChartSongBaseId();
 		var rawVariationName:String = getRawSongVariationName();
 		var variationError:String = getSongVariationValidationError(rawVariationName);
 		if(variationError != null)
@@ -1939,7 +1928,7 @@ class ChartingState extends MusicBeatState implements PsychUIEventHandler.PsychU
 		{
 			var variationLabel:String = rawVariation.length > 0 ? rawVariation : 'default';
 			if(validationError != null) showOutput(validationError, true);
-			else showOutput('Variation changed. Variation: $variationLabel | Suffix: $suffixLabel. Use Reload .json to load the matching chart file.');
+			else showOutput('Song variation changed. Variation: $variationLabel | Suffix: $suffixLabel. Use Reload .json to load the matching chart file.');
 		}
 	}
 
@@ -2010,11 +1999,16 @@ class ChartingState extends MusicBeatState implements PsychUIEventHandler.PsychU
 			if(!candidates.contains(path)) candidates.push(path);
 		}
 
+		function addSongCandidate(suffix:String)
+		{
+			addCandidate('${parentFolder}${PlayState.getSongIdWithSuffix(songName, suffix)}.json');
+		}
+
 		if(variationSuffix.length > 0)
-			addCandidate('${parentFolder}${songName}${variationSuffix}.json');
+			addSongCandidate(variationSuffix);
 
 		if(diffSuffix.length > 0)
-			addCandidate('${parentFolder}${songName}${diffSuffix}.json');
+			addSongCandidate(diffSuffix);
 		else
 			addCandidate('${parentFolder}${songName}.json');
 		if(chartPath != null && chartPath.length > 0) addCandidate(chartPath);
@@ -2382,7 +2376,7 @@ class ChartingState extends MusicBeatState implements PsychUIEventHandler.PsychU
 
 	function loadMeta()
 	{
-		var songId:String = Paths.formatToSongPath(PlayState.SONG.song);
+		var songId:String = getChartSongAssetId();
 		// Recarrega do disco (ou cria novo se não existir)
 		currentMetadata = ChartingMetaHelper.loadOrCreate(PlayState.SONG, songId);
 		// Sincroniza PlayState.SONG
@@ -2402,6 +2396,7 @@ class ChartingState extends MusicBeatState implements PsychUIEventHandler.PsychU
 	{
 		setSongPlaying(false);
 		var time:Float = Conductor.songPosition;
+		var songAssetId:String = getChartSongAudioId();
 
 		if(killAudio)
 		{
@@ -2409,7 +2404,7 @@ class ChartingState extends MusicBeatState implements PsychUIEventHandler.PsychU
 			for (key => snd in Paths.currentTrackedSounds)
 			{
 				//trace(key, snd);
-				if(key.contains('/songs/${Paths.formatToSongPath(PlayState.SONG.song)}/') && snd != null)
+				if(key.contains('/songs/${songAssetId}/') && snd != null)
 				{
 					sndsToKill.push(key);
 					snd.close();
@@ -2426,7 +2421,7 @@ class ChartingState extends MusicBeatState implements PsychUIEventHandler.PsychU
 
 		try
 		{
-			FlxG.sound.playMusic(Paths.inst(PlayState.SONG.song), 0);
+			FlxG.sound.playMusic(Paths.inst(songAssetId), 0);
 			FlxG.sound.music.pause();
 			FlxG.sound.music.time = time;
 			FlxG.sound.music.onComplete = (function() songFinished = true);
@@ -2443,14 +2438,14 @@ class ChartingState extends MusicBeatState implements PsychUIEventHandler.PsychU
 		{
 			try
 			{
-				var playerVocals:Sound = Paths.voices(PlayState.SONG.song, (characterData.vocalsP1 == null || characterData.vocalsP1.length < 1) ? 'Player' : characterData.vocalsP1);
-				vocals.loadEmbedded(playerVocals != null ? playerVocals : Paths.voices(PlayState.SONG.song));
+				var playerVocals:Sound = Paths.voices(songAssetId, (characterData.vocalsP1 == null || characterData.vocalsP1.length < 1) ? 'Player' : characterData.vocalsP1);
+				vocals.loadEmbedded(playerVocals != null ? playerVocals : Paths.voices(songAssetId));
 				vocals.volume = 0;
 				vocals.play();
 				vocals.pause();
 				vocals.time = time;
 				
-				var oppVocals:Sound = Paths.voices(PlayState.SONG.song, (characterData.vocalsP2 == null || characterData.vocalsP2.length < 1) ? 'Opponent' : characterData.vocalsP2);
+				var oppVocals:Sound = Paths.voices(songAssetId, (characterData.vocalsP2 == null || characterData.vocalsP2.length < 1) ? 'Opponent' : characterData.vocalsP2);
 				if(oppVocals != null && oppVocals.length > 0)
 				{
 					opponentVocals.loadEmbedded(oppVocals);
@@ -2479,6 +2474,21 @@ class ChartingState extends MusicBeatState implements PsychUIEventHandler.PsychU
 		Conductor.songPosition = FlxG.sound.music.time = vocals.time = opponentVocals.time = FlxG.sound.music.length - 1;
 		curSec = PlayState.SONG.notes.length - 1;
 		forceDataUpdate = true;
+	}
+
+	function getChartSongBaseId():String
+	{
+		return PlayState.getCurrentSongBaseId(PlayState.SONG);
+	}
+
+	function getChartSongAssetId():String
+	{
+		return PlayState.getSongAssetId(getChartSongBaseId(), PlayState.SONG, PlayState.storyDifficulty);
+	}
+
+	function getChartSongAudioId():String
+	{
+		return PlayState.getSongAudioId(getChartSongBaseId(), PlayState.SONG, PlayState.storyDifficulty);
 	}
 
 	function updateAudioVolume()
@@ -2942,6 +2952,15 @@ class ChartingState extends MusicBeatState implements PsychUIEventHandler.PsychU
 			Reflect.setField(characterData, 'vocalsP$i', data != null && data.vocals_file != null ? data.vocals_file : '');
 		}
 	}
+
+	function removeSongGameOverFields():Void
+	{
+		if(PlayState.SONG == null) return;
+		Reflect.deleteField(PlayState.SONG, 'gameOverChar');
+		Reflect.deleteField(PlayState.SONG, 'gameOverSound');
+		Reflect.deleteField(PlayState.SONG, 'gameOverLoop');
+		Reflect.deleteField(PlayState.SONG, 'gameOverEnd');
+	}
 	
 	var _lastSec:Int = -1;
 	var _lastGfSection:Null<Bool> = null;
@@ -3069,10 +3088,7 @@ class ChartingState extends MusicBeatState implements PsychUIEventHandler.PsychU
 		tab_group.add(opponentMuteCheckBox);
 	}
 
-	var gameOverCharDropDown:PsychUIDropDownMenu;
-	var gameOverSndInputText:PsychUIInputText;
-	var gameOverLoopInputText:PsychUIInputText;
-	var gameOverRetryInputText:PsychUIInputText;
+	var pauseSongInputText:PsychUIInputText;
 	var noRGBCheckBox:PsychUICheckBox;
 	var noteSplashesInputText:PsychUIInputText;
 	function addDataTab()
@@ -3080,33 +3096,11 @@ class ChartingState extends MusicBeatState implements PsychUIEventHandler.PsychU
 		var tab_group = mainBox.getTab('Data').menu;
 		var objX = 10;
 		var objY = 25;
-		gameOverCharDropDown = new PsychUIDropDownMenu(objX, objY, [''], function(id:Int, character:String)
+		pauseSongInputText = new PsychUIInputText(objX, objY, 120, '', 8);
+		pauseSongInputText.onChange = function(old:String, cur:String)
 		{
-			PlayState.SONG.gameOverChar = character;
-			if(character.length < 1) Reflect.deleteField(PlayState.SONG, 'gameOverChar');
-			trace('selected $character');
-		});
-
-		objY += 40;
-		gameOverSndInputText = new PsychUIInputText(objX, objY, 120, '', 8);
-		gameOverSndInputText.onChange = function(old:String, cur:String)
-		{
-			PlayState.SONG.gameOverSound = cur;
-			if(cur.trim().length < 1) Reflect.deleteField(PlayState.SONG, 'gameOverSound');
-		}
-		objY += 40;
-		gameOverLoopInputText = new PsychUIInputText(objX, objY, 120, '', 8);
-		gameOverLoopInputText.onChange = function(old:String, cur:String)
-		{
-			PlayState.SONG.gameOverLoop = cur;
-			if(cur.trim().length < 1) Reflect.deleteField(PlayState.SONG, 'gameOverLoop');
-		}
-		objY += 40;
-		gameOverRetryInputText = new PsychUIInputText(objX, objY, 120, '', 8);
-		gameOverRetryInputText.onChange = function(old:String, cur:String)
-		{
-			PlayState.SONG.gameOverEnd = cur;
-			if(cur.trim().length < 1) Reflect.deleteField(PlayState.SONG, 'gameOverEnd');
+			PlayState.SONG.pauseSong = cur;
+			if(cur.trim().length < 1) Reflect.deleteField(PlayState.SONG, 'pauseSong');
 		}
 
 		objY += 35;
@@ -3120,19 +3114,12 @@ class ChartingState extends MusicBeatState implements PsychUIEventHandler.PsychU
 			if(cur.trim().length < 1) PlayState.SONG.splashSkin = null;
 		}
 	
-		tab_group.add(new FlxText(gameOverCharDropDown.x, gameOverCharDropDown.y - 15, 120, 'Game Over Character:'));
-		tab_group.add(new FlxText(gameOverSndInputText.x, gameOverSndInputText.y - 15, 180, 'Game Over Death Sound (sounds/):'));
-		tab_group.add(new FlxText(gameOverLoopInputText.x, gameOverLoopInputText.y - 15, 180, 'Game Over Loop Music (music/):'));
-		tab_group.add(new FlxText(gameOverRetryInputText.x, gameOverRetryInputText.y - 15, 180, 'Game Over Retry Music (music/):'));
-		tab_group.add(gameOverSndInputText);
-		tab_group.add(gameOverLoopInputText);
-		tab_group.add(gameOverRetryInputText);
+		tab_group.add(new FlxText(pauseSongInputText.x, pauseSongInputText.y - 15, 150, 'Pause Song (music/):'));
+		tab_group.add(pauseSongInputText);
 		tab_group.add(noRGBCheckBox);
 
 		tab_group.add(new FlxText(noteSplashesInputText.x, noteSplashesInputText.y - 15, 120, 'Note Splashes Texture:'));
 		tab_group.add(noteSplashesInputText);
-
-		tab_group.add(gameOverCharDropDown); //lowest priority to display properly
 	}
 
 	var eventDropDown:PsychUIDropDownMenu;
@@ -3668,7 +3655,7 @@ class ChartingState extends MusicBeatState implements PsychUIEventHandler.PsychU
 			// ── Procura eventos específicos da música e dificuldade ──
 			if(PlayState.SONG != null)
 			{
-				var songName:String = Paths.formatToSongPath(PlayState.SONG.song);
+				var songName:String = getChartSongBaseId();
 				var diffName:String = Paths.formatToSongPath(Difficulty.getDefault());
 				if(PlayState.storyDifficulty >= 0 && PlayState.storyDifficulty < Difficulty.list.length)
 					diffName = Paths.formatToSongPath(Difficulty.list[PlayState.storyDifficulty]);
@@ -3972,7 +3959,7 @@ class ChartingState extends MusicBeatState implements PsychUIEventHandler.PsychU
 		};
 
 		tab_group.add(new FlxText(songNameInputText.x, songNameInputText.y - 15, 80, 'Song Name:'));
-		tab_group.add(new FlxText(songVariationInputText.x, songVariationInputText.y - 15, 80, 'Variation:'));
+		tab_group.add(new FlxText(songVariationInputText.x, songVariationInputText.y - 15, 100, 'Song Variation:'));
 		tab_group.add(songNameInputText);
 		tab_group.add(songVariationInputText);
 		tab_group.add(songVariationSuffixText);
@@ -4309,7 +4296,7 @@ class ChartingState extends MusicBeatState implements PsychUIEventHandler.PsychU
 		var inputW = 260;
 
 		// ── Carrega/cria o metadata V-Slice ───────────────────
-		var songId:String = Paths.formatToSongPath(PlayState.SONG.song);
+		var songId:String = getChartSongAssetId();
 		currentMetadata = ChartingMetaHelper.loadOrCreate(PlayState.SONG, songId);
 
 		// Sincroniza PlayState.SONG com os dados do metadata
@@ -4396,7 +4383,7 @@ class ChartingState extends MusicBeatState implements PsychUIEventHandler.PsychU
 		if (previewEndStepper != null && currentMetadata.playData != null)
 			currentMetadata.playData.previewEnd   = previewEndStepper.value;
 
-		var songId:String = Paths.formatToSongPath(PlayState.SONG.song);
+		var songId:String = getChartSongAssetId();
 		var modDir:String = Mods.currentModDirectory;
 
 		var ok = ChartingMetaHelper.save(currentMetadata, PlayState.SONG, songId, modDir);
@@ -4754,7 +4741,7 @@ class ChartingState extends MusicBeatState implements PsychUIEventHandler.PsychU
 				{
 					var path:String = fileDialog.path.replace('\\', '/');
 
-					var chartName:String = Paths.formatToSongPath(PlayState.SONG.song) + '.json';
+					var chartName:String = getChartSongBaseId() + '.json';
 					chartName = chartName.substring(chartName.lastIndexOf('/')+1, chartName.lastIndexOf('.'));
 
 					var chartFile:String = '$path/$chartName-chart.json';
@@ -5683,6 +5670,7 @@ class ChartingState extends MusicBeatState implements PsychUIEventHandler.PsychU
 			PlayState.SONG.events.push(event.songData);
 
 		syncSongNoteStyleForSave();
+		removeSongGameOverFields();
 	}
 
 	function saveChart(canQuickSave:Bool = true)
@@ -5704,7 +5692,7 @@ class ChartingState extends MusicBeatState implements PsychUIEventHandler.PsychU
 		}
 		else
 		{
-			var chartName:String = Paths.formatToSongPath(PlayState.SONG.song) + Difficulty.getVariationAndDifficultyFilePath(getSongVariationName(), PlayState.storyDifficulty) + '.json';
+			var chartName:String = getChartSongAssetId() + '.json';
 			if(Song.chartPath != null) chartName = Song.chartPath.substr(Song.chartPath.lastIndexOf('/')).trim();
 			fileDialog.save(chartName, chartData,
 				function()

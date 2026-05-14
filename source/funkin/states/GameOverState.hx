@@ -1,6 +1,6 @@
 package funkin.states;
 
-import funkin.states.data.menus.freeplay.FreeplayState;
+import funkin.menus.FreeplayState;
 import funkin.data.WeekData;
 import funkin.data.characters.Character;
 // import StoryModeState and other mode classes from appropriate locations
@@ -38,14 +38,15 @@ class GameOverState extends MusicBeatSubstate
 		endSoundName = 'gameOverEnd';
 		deathDelay = 0;
 
-		var _song = PlayState.SONG;
-		if(_song != null)
+		var playerCharacter:Character = PlayState.instance != null ? PlayState.instance.boyfriend : null;
+		if(playerCharacter != null)
 		{
-			if(_song.gameOverChar != null && _song.gameOverChar.trim().length > 0) characterName = _song.gameOverChar;
-			if(_song.gameOverSound != null && _song.gameOverSound.trim().length > 0) deathSoundName = _song.gameOverSound;
-			if(_song.gameOverLoop != null && _song.gameOverLoop.trim().length > 0) loopSoundName = _song.gameOverLoop;
-			if(_song.gameOverEnd != null && _song.gameOverEnd.trim().length > 0) endSoundName = _song.gameOverEnd;
+			if(playerCharacter.gameOverChar != null && playerCharacter.gameOverChar.trim().length > 0) characterName = playerCharacter.gameOverChar;
+			if(playerCharacter.gameOverSound != null && playerCharacter.gameOverSound.trim().length > 0) deathSoundName = playerCharacter.gameOverSound;
+			if(playerCharacter.gameOverLoop != null && playerCharacter.gameOverLoop.trim().length > 0) loopSoundName = playerCharacter.gameOverLoop;
+			if(playerCharacter.gameOverEnd != null && playerCharacter.gameOverEnd.trim().length > 0) endSoundName = playerCharacter.gameOverEnd;
 		}
+
 	}
 
 	var charX:Float = 0;

@@ -3,7 +3,7 @@ package funkin.states;
 import funkin.data.WeekData;
 import funkin.play.shaders.ColorSwap;
 import funkin.utils.states.FlashingState;
-import funkin.states.data.menus.MainMenuState;
+import funkin.menus.MainMenuState;
 
 import flixel.input.keyboard.FlxKey;
 import flixel.graphics.frames.FlxAtlasFrames;
@@ -383,7 +383,7 @@ class TitleState extends MusicBeatState
 
 				new FlxTimer().start(1, function(tmr:FlxTimer)
 				{
-					MusicBeatState.switchState(new funkin.states.data.menus.MainMenuState());
+					MusicBeatState.switchState(new funkin.menus.MainMenuState());
 					closedState = true;
 				});
 				// FlxG.sound.play(Paths.music('titleShoot'), 0.7);

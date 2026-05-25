@@ -1,5 +1,5 @@
 # Friday Night Funkin' Pico Engine
-![Logo](art/banner.png)
+![pico-Logo](art/Funkin-Pico-banner.png)
 - [Playable on GameJolt](https://gamejolt.com/games/Pico-Engine/948902)
 # About
 This project is a custom [Friday Night Funkin'](https://github.com/FunkinCrew/Funkin) engine based on [Psych Engine 1.0.4](https://github.com/ShadowMario/FNF-PsychEngine), developed with a primary focus on delivering an optimized experience for creating Pico-centered mods.

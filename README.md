@@ -19,4 +19,5 @@ If you enjoy this project and would like to support its development, here are so
 
 - **[GitHub Sponsors](https://github.com/sponsors/Lucas62944)** - Support the development directly on GitHub
 - **[itch.io](https://lucas-sanches.itch.io/funkin-pico)** - Play and support the game on itch.io
+
 Every contribution helps keep this project alive and enables us to add more features and improvements!

@@ -57,11 +57,38 @@ jobs:
           haxelib install extension-androidtools --quiet
           haxelib run lime setup -alias -y
 
-      - name: Configure Android target
+      - name: Write hxcpp Android config
         run: |
-          haxelib run lime config ANDROID_SDK $ANDROID_HOME
-          haxelib run lime config ANDROID_NDK_ROOT $ANDROID_HOME/ndk/26.3.11579264
-          haxelib run lime config JAVA_HOME $JAVA_HOME
+          NDK_PATH="$ANDROID_HOME/ndk/26.3.11579264"
+          CONFIG_FILE="$HOME/.hxcpp_config.xml"
+          cat > "$CONFIG_FILE" << XMLEOF
+          <xml>
+            <section id="vars">
+              <set name="ANDROID_SDK"      value="$ANDROID_HOME" />
+              <set name="ANDROID_NDK_ROOT" value="$NDK_PATH" />
+              <set name="JAVA_HOME"        value="$JAVA_HOME" />
+              <set name="ANDROID_SETUP"    value="1" />
+            </section>
+          </xml>
+          XMLEOF
+          echo "Wrote $CONFIG_FILE"
+          cat "$CONFIG_FILE"
+
+      - name: Write Lime Android config
+        run: |
+          NDK_PATH="$ANDROID_HOME/ndk/26.3.11579264"
+          LIME_CONFIG="$HOME/.lime/config.json"
+          mkdir -p "$(dirname $LIME_CONFIG)"
+          cat > "$LIME_CONFIG" << JSONEOF
+          {
+            "ANDROID_SDK": "$ANDROID_HOME",
+            "ANDROID_NDK_ROOT": "$NDK_PATH",
+            "JAVA_HOME": "$JAVA_HOME",
+            "ANDROID_SETUP": true
+          }
+          JSONEOF
+          echo "Wrote $LIME_CONFIG"
+          cat "$LIME_CONFIG"
 
       - name: Create missing asset directories
         run: |
@@ -81,6 +108,9 @@ jobs:
           touch assets/funkin_assets/.gitkeep
 
       - name: Build APK
+        env:
+          ANDROID_SDK_ROOT: ${{ env.ANDROID_HOME }}
+          ANDROID_NDK_ROOT: ${{ env.ANDROID_HOME }}/ndk/26.3.11579264
         run: haxelib run lime build android -final -no-debug
 
       - name: Locate and rename APK

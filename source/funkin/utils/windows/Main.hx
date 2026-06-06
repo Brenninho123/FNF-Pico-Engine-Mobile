@@ -7,6 +7,8 @@ import android.content.Context;
 import flixel.graphics.FlxGraphic;
 import flixel.FlxGame;
 import flixel.FlxState;
+import flixel.FlxG;
+import flixel.util.FlxColor;
 import haxe.io.Path;
 
 import openfl.Assets;
@@ -18,7 +20,7 @@ import lime.app.Application;
 
 import funkin.play.Highscore;
 import funkin.states.TitleState;
-import funkin.utils.DebugDisplay as FPSCounter; // By Betadciu and Nightmare Vision,
+import funkin.utils.DebugDisplay as FPSCounter;
 import funkin.utils.Native;
 
 #if HSCRIPT_ALLOWED
@@ -34,14 +36,14 @@ import lime.graphics.Image;
 import funkin.utils.ALSoftConfig;
 #end
 
-//crash handler stuff
 #if CRASH_HANDLER
 import openfl.events.UncaughtErrorEvent;
 import haxe.CallStack;
 import haxe.io.Path;
+import sys.FileSystem;
+import sys.io.File;
 #end
 
-// NATIVE API STUFF, YOU CAN IGNORE THIS AND SCROLL //
 #if (linux && !debug)
 @:cppInclude('./external/gamemode_client.h')
 @:cppFileCode('#define GAMEMODE_AUTO')
@@ -50,14 +52,54 @@ import haxe.io.Path;
 class Main extends Sprite
 {
 	public static final game = {
-		width: 1280, // WINDOW width
-		height: 720, // WINDOW height
-		initialState: TitleState, // initial game state
-		framerate: 60, // default framerate
-		skipSplash: true, // if the default flixel splash screen should be skipped
-		startFullscreen: false // if the game should start at fullscreen mode
+		width: 1280,
+		height: 720,
+		initialState: TitleState,
+		framerate: 60,
+		skipSplash: true,
+		startFullscreen: false
 	};
+
 	public static var fpsVar:FPSCounter;
+
+	public static var storageDirectory(get, never):String;
+
+	static function get_storageDirectory():String
+	{
+		#if android
+		return getAndroidExternalStorage();
+		#elseif ios
+		return lime.system.System.documentsDirectory + "/";
+		#else
+		return "./";
+		#end
+	}
+
+	#if android
+	static function getAndroidExternalStorage():String
+	{
+		final extPath = haxe.JNI.callStaticMethod(
+			"android/os/Environment",
+			"getExternalStorageDirectory",
+			"()Ljava/io/File;"
+		);
+		if (extPath != null)
+		{
+			final abs:String = haxe.JNI.callMember(extPath, "getAbsolutePath", "()Ljava/lang/String;");
+			if (abs != null && abs.length > 0)
+				return abs + "/PicoEngine/";
+		}
+		return Context.getExternalFilesDir() + "/";
+	}
+	#end
+
+	static function ensureStorageDirectory(path:String):Void
+	{
+		#if (sys)
+		if (!sys.FileSystem.exists(path))
+			sys.FileSystem.createDirectory(path);
+		#end
+	}
 
 	public static function main():Void
 	{
@@ -72,14 +114,16 @@ class Main extends Sprite
 		Native.fixScaling();
 		#end
 
-		// Credits to MAJigsaw77 (he's the og author for this code)
 		#if android
-		Sys.setCwd(Path.addTrailingSlash(Context.getExternalFilesDir()));
+		final extDir = storageDirectory;
+		ensureStorageDirectory(extDir);
+		Sys.setCwd(extDir);
 		#elseif ios
 		Sys.setCwd(lime.system.System.applicationStorageDirectory);
 		#end
+
 		#if VIDEOS_ALLOWED
-		hxvlc.util.Handle.init(#if (hxvlc >= "1.8.0")  ['--no-lua'] #end);
+		hxvlc.util.Handle.init(#if (hxvlc >= "1.8.0") ['--no-lua'] #end);
 		#end
 
 		#if LUA_ALLOWED
@@ -91,80 +135,35 @@ class Main extends Sprite
 		Highscore.load();
 
 		#if HSCRIPT_ALLOWED
-		Iris.warn = function(x, ?pos:haxe.PosInfos) {
-			Iris.logLevel(WARN, x, pos);
-			var newPos:HScriptInfos = cast pos;
-			if (newPos.showLine == null) newPos.showLine = true;
-			var msgInfo:String = (newPos.funcName != null ? '(${newPos.funcName}) - ' : '')  + '${newPos.fileName}:';
-			#if LUA_ALLOWED
-			if (newPos.isLua == true) {
-				msgInfo += 'HScript:';
-				newPos.showLine = false;
-			}
-			#end
-			if (newPos.showLine == true) {
-				msgInfo += '${newPos.lineNumber}:';
-			}
-			msgInfo += ' $x';
-			if (PlayState.instance != null)
-				PlayState.instance.addTextToDebug('WARNING: $msgInfo', FlxColor.YELLOW);
-		}
-		Iris.error = function(x, ?pos:haxe.PosInfos) {
-			Iris.logLevel(ERROR, x, pos);
-			var newPos:HScriptInfos = cast pos;
-			if (newPos.showLine == null) newPos.showLine = true;
-			var msgInfo:String = (newPos.funcName != null ? '(${newPos.funcName}) - ' : '')  + '${newPos.fileName}:';
-			#if LUA_ALLOWED
-			if (newPos.isLua == true) {
-				msgInfo += 'HScript:';
-				newPos.showLine = false;
-			}
-			#end
-			if (newPos.showLine == true) {
-				msgInfo += '${newPos.lineNumber}:';
-			}
-			msgInfo += ' $x';
-			if (PlayState.instance != null)
-				PlayState.instance.addTextToDebug('ERROR: $msgInfo', FlxColor.RED);
-		}
-		Iris.fatal = function(x, ?pos:haxe.PosInfos) {
-			Iris.logLevel(FATAL, x, pos);
-			var newPos:HScriptInfos = cast pos;
-			if (newPos.showLine == null) newPos.showLine = true;
-			var msgInfo:String = (newPos.funcName != null ? '(${newPos.funcName}) - ' : '')  + '${newPos.fileName}:';
-			#if LUA_ALLOWED
-			if (newPos.isLua == true) {
-				msgInfo += 'HScript:';
-				newPos.showLine = false;
-			}
-			#end
-			if (newPos.showLine == true) {
-				msgInfo += '${newPos.lineNumber}:';
-			}
-			msgInfo += ' $x';
-			if (PlayState.instance != null)
-				PlayState.instance.addTextToDebug('FATAL: $msgInfo', 0xFFBB0000);
-		}
+		setupIrisCallbacks();
 		#end
 
-		#if LUA_ALLOWED Lua.set_callbacks_function(cpp.Callable.fromStaticFunction(funkin.modding.scripting.psychlua.CallbackHandler.call)); #end
+		#if LUA_ALLOWED
+		Lua.set_callbacks_function(cpp.Callable.fromStaticFunction(funkin.modding.scripting.psychlua.CallbackHandler.call));
+		#end
+
 		Controls.instance = new Controls();
 		ClientPrefs.loadDefaultKeys();
-		#if ACHIEVEMENTS_ALLOWED Achievements.load(); #end
+
+		#if ACHIEVEMENTS_ALLOWED
+		Achievements.load();
+		#end
+
 		addChild(new FlxGame(game.width, game.height, game.initialState, game.framerate, game.framerate, game.skipSplash, game.startFullscreen));
 
-		#if !mobile
+		#if desktop
 		fpsVar = new FPSCounter(10, 3, 0xFFFFFF);
 		addChild(fpsVar);
 		Lib.current.stage.align = "tl";
 		Lib.current.stage.scaleMode = StageScaleMode.NO_SCALE;
-		if(fpsVar != null) {
+		if (fpsVar != null)
+		{
 			fpsVar.visible = (ClientPrefs.data.fpsDisplay != 'Disabled');
 			fpsVar.updateBackgroundAlpha(ClientPrefs.data.debugDisplayBG);
 		}
 		#end
 
-		#if (linux || mac) // fix the app icon not showing up on the Linux Panel / Mac Dock
+		#if (linux || mac)
 		var icon = Image.fromFile("icon.png");
 		Lib.current.stage.window.setIcon(icon);
 		#end
@@ -176,8 +175,11 @@ class Main extends Sprite
 
 		FlxG.fixedTimestep = false;
 		FlxG.game.focusLostFramerate = 60;
+
+		#if desktop
 		FlxG.keys.preventDefaultKeys = [TAB];
-		
+		#end
+
 		#if CRASH_HANDLER
 		Lib.current.loaderInfo.uncaughtErrorEvents.addEventListener(UncaughtErrorEvent.UNCAUGHT_ERROR, onCrash);
 		#end
@@ -186,72 +188,194 @@ class Main extends Sprite
 		DiscordClient.prepare();
 		#end
 
-		// shader coords fix
-		FlxG.signals.gameResized.add(function (w, h) {
-		     if (FlxG.cameras != null) {
-			   for (cam in FlxG.cameras.list) {
-				if (cam != null && cam.filters != null)
-					resetSpriteCache(cam.flashSprite);
-			   }
+		FlxG.signals.gameResized.add(function(w, h)
+		{
+			if (FlxG.cameras != null)
+			{
+				for (cam in FlxG.cameras.list)
+				{
+					if (cam != null && cam.filters != null)
+						resetSpriteCache(cam.flashSprite);
+				}
 			}
-
 			if (FlxG.game != null)
-			resetSpriteCache(FlxG.game);
+				resetSpriteCache(FlxG.game);
 		});
 	}
 
-	static function resetSpriteCache(sprite:Sprite):Void {
-		@:privateAccess {
-		        sprite.__cacheBitmap = null;
+	static function resetSpriteCache(sprite:Sprite):Void
+	{
+		@:privateAccess
+		{
+			sprite.__cacheBitmap = null;
 			sprite.__cacheBitmapData = null;
 		}
 	}
 
+	#if HSCRIPT_ALLOWED
+	static function setupIrisCallbacks():Void
+	{
+		Iris.warn = function(x, ?pos:haxe.PosInfos)
+		{
+			Iris.logLevel(WARN, x, pos);
+			final msg = buildIrisMessage(x, pos);
+			if (PlayState.instance != null)
+				PlayState.instance.addTextToDebug('WARNING: $msg', FlxColor.YELLOW);
+		};
+		Iris.error = function(x, ?pos:haxe.PosInfos)
+		{
+			Iris.logLevel(ERROR, x, pos);
+			final msg = buildIrisMessage(x, pos);
+			if (PlayState.instance != null)
+				PlayState.instance.addTextToDebug('ERROR: $msg', FlxColor.RED);
+		};
+		Iris.fatal = function(x, ?pos:haxe.PosInfos)
+		{
+			Iris.logLevel(FATAL, x, pos);
+			final msg = buildIrisMessage(x, pos);
+			if (PlayState.instance != null)
+				PlayState.instance.addTextToDebug('FATAL: $msg', 0xFFBB0000);
+		};
+	}
+
+	static function buildIrisMessage(x:Dynamic, pos:haxe.PosInfos):String
+	{
+		final newPos:HScriptInfos = cast pos;
+		if (newPos.showLine == null)
+			newPos.showLine = true;
+
+		var info = (newPos.funcName != null ? '(${newPos.funcName}) - ' : '') + '${newPos.fileName}:';
+
+		#if LUA_ALLOWED
+		if (newPos.isLua == true)
+		{
+			info += 'HScript:';
+			newPos.showLine = false;
+		}
+		#end
+
+		if (newPos.showLine == true)
+			info += '${newPos.lineNumber}:';
+
+		return '$info $x';
+	}
+	#end
+
 	#if CRASH_HANDLER
 	function onCrash(e:UncaughtErrorEvent):Void
 	{
-		var errMsg:String = "";
-		var path:String;
-		var callStack:Array<StackItem> = CallStack.exceptionStack(true);
-		var dateNow:String = Date.now().toString();
+		e.preventDefault();
+		e.stopImmediatePropagation();
 
-		dateNow = dateNow.replace(" ", "");
-		dateNow = dateNow.replace("_", "()");
+		final callStack:Array<StackItem> = CallStack.exceptionStack(true);
+		final dateNow:String = Date.now().toString().replace(" ", "_").replace(":", "-");
 
-		path = "./content/logs/" + "PicoCrashLog-" + dateNow + ".txt";
-
-		for (stackItem in callStack)
+		var errMsg = "";
+		for (item in callStack)
 		{
-			switch (stackItem)
+			switch (item)
 			{
 				case FilePos(s, file, line, column):
 					errMsg += file + " (line " + line + ")\n";
 				default:
-					Sys.println(stackItem);
 			}
 		}
-
 		errMsg += "\nUncaught Error: " + e.error;
-		// remove if you're modding and want the crash log message to contain the link
-		// please remember to actually modify the link for the github page to report the issues to.
+
 		#if officialBuild
-		errMsg += "\nPlease report this error to the GitHub page: https://github.com/ShadowMario/FNF-PsychEngine";
+		errMsg += "\nPlease report this error: https://github.com/Brenninho123/FNF-Pico-Engine-Mobile/issues";
 		#end
+
 		errMsg += "\n\n> Crash Handler written by: sqirra-rng";
 
-		if (!FileSystem.exists("./content/logs/"))
-			FileSystem.createDirectory("./content/logs/");
+		saveCrashLog(dateNow, errMsg);
+		showCrashOverlay(errMsg);
+	}
 
-		File.saveContent(path, errMsg + "\n");
-
-		Sys.println(errMsg);
-		Sys.println("Crash dump saved in " + Path.normalize(path));
-
-		Application.current.window.alert(errMsg, "Error!");
-		#if DISCORD_ALLOWED
-		DiscordClient.shutdown();
+	function saveCrashLog(dateNow:String, errMsg:String):Void
+	{
+		#if (sys)
+		final logDir = storageDirectory + "content/logs/";
+		ensureStorageDirectory(logDir);
+		final path = logDir + "PicoCrashLog-" + dateNow + ".txt";
+		try { File.saveContent(path, errMsg + "\n"); } catch (_) {}
 		#end
-		Sys.exit(1);
+	}
+
+	function showCrashOverlay(errMsg:String):Void
+	{
+		final overlay = new CrashOverlay(errMsg);
+		addChild(overlay);
 	}
 	#end
 }
+
+#if CRASH_HANDLER
+class CrashOverlay extends Sprite
+{
+	var _label:openfl.text.TextField;
+	var _bg:openfl.display.Shape;
+	var _btnClose:openfl.display.Sprite;
+	var _btnContinue:openfl.display.Sprite;
+
+	public function new(message:String)
+	{
+		super();
+
+		_bg = new openfl.display.Shape();
+		_bg.graphics.beginFill(0x000000, 0.88);
+		_bg.graphics.drawRect(0, 0, Lib.current.stage.stageWidth, Lib.current.stage.stageHeight);
+		_bg.graphics.endFill();
+		addChild(_bg);
+
+		_label = new openfl.text.TextField();
+		_label.defaultTextFormat = new openfl.text.TextFormat("_sans", 18, 0xFF4444, true);
+		_label.width  = Lib.current.stage.stageWidth - 80;
+		_label.height = Lib.current.stage.stageHeight - 160;
+		_label.x = 40;
+		_label.y = 40;
+		_label.multiline  = true;
+		_label.wordWrap   = true;
+		_label.selectable = false;
+		_label.text = "A crash was caught and the game kept running.\n\n" + message;
+		addChild(_label);
+
+		_btnContinue = makeButton("Continue", 0x226622, 40, Lib.current.stage.stageHeight - 90);
+		_btnContinue.addEventListener(openfl.events.MouseEvent.CLICK, function(_) { parent.removeChild(this); });
+		addChild(_btnContinue);
+
+		_btnClose = makeButton("Exit Game", 0x882222, 240, Lib.current.stage.stageHeight - 90);
+		_btnClose.addEventListener(openfl.events.MouseEvent.CLICK, function(_)
+		{
+			#if DISCORD_ALLOWED
+			DiscordClient.shutdown();
+			#end
+			Sys.exit(0);
+		});
+		addChild(_btnClose);
+	}
+
+	function makeButton(label:String, color:Int, x:Float, y:Float):openfl.display.Sprite
+	{
+		final s = new openfl.display.Sprite();
+		s.graphics.beginFill(color);
+		s.graphics.drawRoundRect(0, 0, 180, 50, 12, 12);
+		s.graphics.endFill();
+
+		final tf = new openfl.text.TextField();
+		tf.defaultTextFormat = new openfl.text.TextFormat("_sans", 16, 0xFFFFFF, true);
+		tf.width  = 180;
+		tf.height = 50;
+		tf.text   = label;
+		tf.selectable = false;
+		tf.mouseEnabled = false;
+		s.addChild(tf);
+
+		s.x = x;
+		s.y = y;
+		s.buttonMode  = true;
+		s.useHandCursor = true;
+		return s;
+	}
+}
+#end
